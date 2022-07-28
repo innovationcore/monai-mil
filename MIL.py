@@ -4,6 +4,9 @@ import os
 import shutil
 import time
 
+from clearml import Logger
+from clearml import Task
+
 import gdown
 import numpy as np
 import sklearn
@@ -457,6 +460,19 @@ def main_worker(gpu, args):
 
                 #send to clearml
 
+                Logger.current_logger().report_scalar("ACC", "val_acc", iteration=epoch,
+                                                      value=val_acc)
+                Logger.current_logger().report_scalar("Loss", "val_loss", iteration=epoch,
+                                                      value=val_loss)
+                Logger.current_logger().report_scalar("AUC", "val_auc", iteration=epoch,
+                                                      value=auc)
+                Logger.current_logger().report_scalar("Precision", "val_precision", iteration=epoch,
+                                                      value=precision)
+                Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch,
+                                                      value=recall)
+                Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch,
+                                                      value=fbeta_score)
+
                 if writer is not None:
                     writer.add_scalar("val_loss", val_loss, epoch)
                     writer.add_scalar("val_acc", val_acc, epoch)
@@ -531,6 +547,9 @@ def parse_args():
         "--quick", action="store_true", help="use a small subset of data for debugging"
     )  # for debugging
 
+    parser.add_argument('--project_name', type=str, default='monai-mil', help='name of project')
+    parser.add_argument('--task_name', type=str, default='monai-mil_template', help='name of task')
+
     args = parser.parse_args()
 
     print("Argument values:")
@@ -545,13 +564,10 @@ if __name__ == "__main__":
 
     args = parse_args()
 
+    task = Task.init(project_name=args.project_name, task_name=args.task_name)
+
     if args.dataset_json is None:
-        # download default json datalist
-        resource = "https://drive.google.com/uc?id=1L6PtKBlHHyUgTE4rVhRuOLTQKgD4tBRK"
-        dst = "./datalist_panda_0.json"
-        if not os.path.exists(dst):
-            gdown.download(resource, dst, quiet=False)
-        args.dataset_json = dst
+        print('Error: no dataset specified')
 
     if args.distributed:
         ngpus_per_node = torch.cuda.device_count()
