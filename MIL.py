@@ -179,12 +179,9 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
         fpr, tpr, thresholds = roc_curve(TARGETS, PREDS, pos_label=1)
         auc = sklearn.metrics.auc(fpr, tpr)
-        precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1)
+        precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
 
-        print("auc: " + str(auc))
-        print("precision: " + str(precision) + " recall: " + str(recall))
-
-    return loss, acc, qwk
+    return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
 
 
 def save_checkpoint(model, epoch, args, filename="model.pt", best_acc=0):
@@ -373,7 +370,9 @@ def main_worker(gpu, args):
     if args.validate:
         # if we only want to validate existing checkpoint
         epoch_time = time.time()
-        val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        #val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+
         if args.rank == 0:
             print(
                 "Final validation loss: {:.4f}".format(val_loss),
@@ -442,15 +441,22 @@ def main_worker(gpu, args):
         if (epoch + 1) % args.val_every == 0:
 
             epoch_time = time.time()
-            val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
+            #val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
+            val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
             if args.rank == 0:
                 print(
                     "Final validation  {}/{}".format(epoch, n_epochs - 1),
                     "loss: {:.4f}".format(val_loss),
                     "acc: {:.4f}".format(val_acc),
+                    "auc: {:.4f}".format(auc),
+                    "precision: {:.4f}".format(precision),
+                    "recall: {:.4f}".format(recall),
                     "qwk: {:.4f}".format(qwk),
                     "time {:.2f}s".format(time.time() - epoch_time),
                 )
+
+                #send to clearml
+
                 if writer is not None:
                     writer.add_scalar("val_loss", val_loss, epoch)
                     writer.add_scalar("val_acc", val_acc, epoch)
