@@ -1,0 +1,35 @@
+Train
+Train in multi-gpu mode with AMP using all available gpus, assuming the training images in /PandaChallenge2020/train_images folder, it will use the pre-defined 80/20 data split in datalist_panda_0.json
+
+python -u panda_mil_train_evaluate_pytorch_gpu.py
+    --data_root=/PandaChallenge2020/train_images \
+    --amp \
+    --distributed \
+    --mil_mode=att_trans \
+    --batch_size=4 \
+    --epochs=50 \
+    --logdir=./logs
+
+python -u MIL.py --dataset_json=dataset_slides.json --data_root=/slides --amp --distributed --mil_mode=att_trans --batch_size=4 --epochs=50 --logdir=./logs --workers=4 --tile_size=256
+
+Validation
+Run inference of the best checkpoint over the validation set
+
+# Validate checkpoint on a single gpu
+python -u panda_mil_train_evaluate_pytorch_gpu.py
+    --data_root=/PandaChallenge2020/train_images \
+    --amp \
+    --mil_mode=att_trans \
+    --checkpoint=./logs/model.pt \
+    --validate
+
+Inference
+Run inference on a different dataset. It's the same script as for validation, we just specify a different data_root and json list files
+
+python -u panda_mil_train_evaluate_pytorch_gpu.py
+    --data_root=/PandaChallenge2020/some_other_files \
+    --dataset_json=some_other_files.json
+    --amp \
+    --mil_mode=att_trans \
+    --checkpoint=./logs/model.pt \
+    --validate
