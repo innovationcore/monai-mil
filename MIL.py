@@ -6,6 +6,7 @@ import time
 
 import gdown
 import numpy as np
+import sklearn
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -26,7 +27,7 @@ from monai.transforms import (
     ScaleIntensityRanged,
     ToTensord,
 )
-from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import cohen_kappa_score, roc_curve, precision_recall_fscore_support
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
@@ -175,6 +176,13 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
         PREDS = PREDS.get_buffer().cpu().numpy()
         TARGETS = TARGETS.get_buffer().cpu().numpy()
         qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
+
+        fpr, tpr, thresholds = roc_curve(TARGETS, PREDS, pos_label=1)
+        auc = sklearn.metrics.auc(fpr, tpr)
+        precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1)
+
+        print("auc: " + str(auc))
+        print("precision: " + str(precision) + " recall: " + str(recall))
 
     return loss, acc, qwk
 
