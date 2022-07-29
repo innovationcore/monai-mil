@@ -245,10 +245,11 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('target: ' + str(target))
 
             with autocast(enabled=args.amp):
+                print(data)
                 print(data.shape[1])
                 print(max_tiles)
                 print(type(data))
-
+                exit(0)
                 if max_tiles is not None and data.shape[1] > max_tiles:
                     # During validation, we want to use all instances/patches
                     # and if its number is very big, we may run out of GPU memory
