@@ -212,10 +212,11 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
-            print('idx: ' + str(idx))
-            print('batch_data: ' + str(batch_data))
-            print('data: ' + str(data))
-            print('target: ' + str(target))
+            #print('idx: ' + str(idx))
+            print('batch_data: ' + str(type(batch_data)))
+            print('batch_data: ' + str(type(batch_data[0])))
+            #print('data: ' + str(data))
+            #print('target: ' + str(target))
 
             with autocast(enabled=args.amp):
 
