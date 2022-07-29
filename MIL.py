@@ -225,6 +225,12 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             print('patch_location3: ' + str(
                 batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict']))
 
+            print('patch_location4: ' + str(
+                batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict']['patch_size']))
+
+            print('patch_location5: ' + str(type(
+                batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict'][
+                    'patch_size'])))
 
             #print('patch_size: ' + str(batch_data['patch_size']))
             #print('num_patches: ' + str(batch_data['num_patches']))
