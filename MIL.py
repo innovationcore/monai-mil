@@ -210,6 +210,13 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
+            '''
+            # use the grid patch dataset
+            for item in DataLoader(ds, batch_size=2, num_workers=2):
+                print("patch size:", item[0].shape)
+                print("coordinates:", item[1])
+            '''
+
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
             #['image', 'label', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms']
@@ -217,8 +224,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('batch_data 0: ' + str(type(batch_data)))
             #print('batch_data 1: ' + str(type(batch_data[0])))
             #print('batch_data 2: ' + str(batch_data[0]['Metadata']))
-            print('data: ' + str(batch_data))
-            exit(0)
+            #print('data: ' + str(batch_data))
+            #exit(0)
             #['metadata', 'metadata_meta_dict', 'metadata_transforms']
             #print('patch_location: ' + str(batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray).keys()))
             #print('patch_location2: ' + str(
@@ -250,6 +257,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
                 print(data.shape[1])
                 print(max_tiles)
                 print(type(data))
+                print("coordinates:", data[1])
                 exit(0)
                 if max_tiles is not None and data.shape[1] > max_tiles:
                     # During validation, we want to use all instances/patches
@@ -458,6 +466,7 @@ def main_worker(gpu, args):
             ToTensord(keys=["image", "label"]),
         ]
     )
+
 
     dataset_train = Dataset(data=training_list, transform=train_transform)
     dataset_valid = Dataset(data=validation_list, transform=valid_transform)
