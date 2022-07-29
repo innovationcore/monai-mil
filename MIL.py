@@ -186,6 +186,110 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
     return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
 
+def infer_epoch(model, loader, epoch, args, max_tiles=None):
+    """One validation epoch over the dataset"""
+
+    model.eval()
+
+    model2 = model if not args.distributed else model.module
+    has_extra_outputs = model2.mil_mode == "att_trans_pyramid"
+    extra_outputs = model2.extra_outputs
+    calc_head = model2.calc_head
+
+    criterion = nn.BCEWithLogitsLoss()
+
+    run_loss = CumulativeAverage()
+    run_acc = CumulativeAverage()
+    PREDS = Cumulative()
+    TARGETS = Cumulative()
+
+    start_time = time.time()
+    loss, acc = 0.0, 0.0
+
+    with torch.no_grad():
+
+        for idx, batch_data in enumerate(loader):
+
+            data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
+
+            print('idx: ' + str(idx))
+            print('batch_data: ' + str(batch_data))
+            print('data: ' + str(data))
+            print('target: ' + str(target))
+
+            with autocast(enabled=args.amp):
+
+                if max_tiles is not None and data.shape[1] > max_tiles:
+                    # During validation, we want to use all instances/patches
+                    # and if its number is very big, we may run out of GPU memory
+                    # in this case, we first iteratively go over subsets of patches to calculate backbone features
+                    # and at the very end calculate the classification output
+
+                    logits = []
+                    logits2 = []
+
+                    for i in range(int(np.ceil(data.shape[1] / float(max_tiles)))):
+                        data_slice = data[:, i * max_tiles : (i + 1) * max_tiles]
+                        logits_slice = model(data_slice, no_head=True)
+                        logits.append(logits_slice)
+
+                        if has_extra_outputs:
+                            logits2.append(
+                                [
+                                    extra_outputs["layer1"],
+                                    extra_outputs["layer2"],
+                                    extra_outputs["layer3"],
+                                    extra_outputs["layer4"],
+                                ]
+                            )
+
+                    logits = torch.cat(logits, dim=1)
+                    if has_extra_outputs:
+                        extra_outputs["layer1"] = torch.cat([l[0] for l in logits2], dim=0)
+                        extra_outputs["layer2"] = torch.cat([l[1] for l in logits2], dim=0)
+                        extra_outputs["layer3"] = torch.cat([l[2] for l in logits2], dim=0)
+                        extra_outputs["layer4"] = torch.cat([l[3] for l in logits2], dim=0)
+
+                    logits = calc_head(logits)
+
+                else:
+                    # if number of instances is not big, we can run inference directly
+                    logits = model(data)
+
+                loss = criterion(logits, target)
+
+            pred = logits.sigmoid().sum(1).detach().round()
+            target = target.sum(1).round()
+            acc = (pred == target).float().mean()
+
+            run_loss.append(loss)
+            run_acc.append(acc)
+            loss = run_loss.aggregate()
+            acc = run_acc.aggregate()
+
+            PREDS.extend(pred)
+            TARGETS.extend(target)
+
+            if args.rank == 0:
+                print(
+                    "Val epoch {}/{} {}/{}".format(epoch, args.epochs, idx, len(loader)),
+                    "loss: {:.4f}".format(loss),
+                    "acc: {:.4f}".format(acc),
+                    "time {:.2f}s".format(time.time() - start_time),
+                )
+            start_time = time.time()
+
+        # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
+        PREDS = PREDS.get_buffer().cpu().numpy()
+        TARGETS = TARGETS.get_buffer().cpu().numpy()
+        qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
+
+        fpr, tpr, thresholds = roc_curve(TARGETS, PREDS, pos_label=1)
+        auc = sklearn.metrics.auc(fpr, tpr)
+        precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
+
+    return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
+
 
 def save_checkpoint(model, epoch, args, filename="model.pt", best_acc=0):
     """Save checkpoint"""
@@ -386,6 +490,22 @@ def main_worker(gpu, args):
 
         exit(0)
 
+    if args.infer:
+        # if we only want to validate existing checkpoint
+        epoch_time = time.time()
+        #val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = infer_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+
+        if args.rank == 0:
+            print(
+                "Final validation loss: {:.4f}".format(val_loss),
+                "acc: {:.4f}".format(val_acc),
+                "qwk: {:.4f}".format(qwk),
+                "time {:.2f}s".format(time.time() - epoch_time),
+            )
+
+        exit(0)
+
     params = model.parameters()
 
     if args.mil_mode in ["att_trans", "att_trans_pyramid"]:
@@ -516,6 +636,12 @@ def parse_args():
         "--validate",
         action="store_true",
         help="run only inference on the validation set, must specify the checkpoint argument",
+    )
+
+    parser.add_argument(
+        "--infer",
+        action="store_true",
+        help="run only inference on the inference set, must specify the checkpoint argument",
     )
 
     parser.add_argument("--logdir", default=None, help="path to log directory to store Tensorboard logs")
