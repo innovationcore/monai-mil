@@ -210,6 +210,9 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
+            print("patch size:", batch_data[0].shape)
+            print("coordinates:", batch_data[1])
+            exit(0)
             '''
             # use the grid patch dataset
             for item in DataLoader(ds, batch_size=2, num_workers=2):
@@ -257,7 +260,6 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
                 print(data.shape[1])
                 print(max_tiles)
                 print(type(data))
-                print("coordinates:", data[1])
                 exit(0)
                 if max_tiles is not None and data.shape[1] > max_tiles:
                     # During validation, we want to use all instances/patches
