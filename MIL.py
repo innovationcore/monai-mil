@@ -217,10 +217,10 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('batch_data 0: ' + str(type(batch_data)))
             #print('batch_data 1: ' + str(type(batch_data[0])))
             #print('batch_data 2: ' + str(batch_data[0]['Metadata']))
-            print('image: ' + str(batch_data['image']))
+            #print('image: ' + str(batch_data['image']))
             print('patch_location: ' + str(batch_data['patch_location']))
-            print('patch_size: ' + str(batch_data['patch_size']))
-            print('num_patches: ' + str(batch_data['num_patches']))
+            #print('patch_size: ' + str(batch_data['patch_size']))
+            #print('num_patches: ' + str(batch_data['num_patches']))
 
             #print('batch_data 2: ' + str(type(data)))
 
