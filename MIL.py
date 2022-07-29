@@ -208,17 +208,14 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
     with torch.no_grad():
 
+        for item in loader:
+            print("patch size:", item[0].shape)
+            print("coordinates:", item[1])
+
+        exit(0)
+
         for idx, batch_data in enumerate(loader):
 
-            print("patch size:", batch_data[0].shape)
-            print("coordinates:", batch_data[1])
-            exit(0)
-            '''
-            # use the grid patch dataset
-            for item in DataLoader(ds, batch_size=2, num_workers=2):
-                print("patch size:", item[0].shape)
-                print("coordinates:", item[1])
-            '''
 
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
