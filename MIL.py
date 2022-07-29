@@ -16,12 +16,13 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 from monai.config import KeysCollection
 from monai.data import Dataset, load_decathlon_datalist
-#from monai.data.wsi_reader import WSIReader
-from monai.data.image_reader import WSIReader
+from monai.data.wsi_reader import WSIReader
+#from monai.data.image_reader import WSIReader
 from monai.metrics import Cumulative, CumulativeAverage
 from monai.networks.nets import milmodel
 from monai.transforms import (
     Compose,
+    GridPath,
     GridPatchd,
     LoadImaged,
     MapTransform,
@@ -457,7 +458,8 @@ def main_worker(gpu, args):
         [
             LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
-            GridPatchd(
+            GridPath(
+            #GridPatchd(
                 keys=["image"],
                 patch_size=(args.tile_size, args.tile_size),
                 threshold=0.999 * 3 * 255 * args.tile_size * args.tile_size,
