@@ -22,7 +22,6 @@ from monai.metrics import Cumulative, CumulativeAverage
 from monai.networks.nets import milmodel
 from monai.transforms import (
     Compose,
-    GridPath,
     GridPatchd,
     LoadImaged,
     MapTransform,
