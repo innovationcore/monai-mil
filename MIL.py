@@ -208,9 +208,9 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
     with torch.no_grad():
 
-        for item in loader:
-            print("patch size:", item[0].shape)
-            print("coordinates:", item[1])
+
+        print(type(loader))
+
 
         exit(0)
 
