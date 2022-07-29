@@ -16,7 +16,8 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 from monai.config import KeysCollection
 from monai.data import Dataset, load_decathlon_datalist
-from monai.data.wsi_reader import WSIReader
+#from monai.data.wsi_reader import WSIReader
+from monai.data.image_reader import WSIReader
 from monai.metrics import Cumulative, CumulativeAverage
 from monai.networks.nets import milmodel
 from monai.transforms import (
