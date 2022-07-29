@@ -215,6 +215,9 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('idx: ' + str(idx))
             print('batch_data: ' + str(type(batch_data)))
             print('batch_data: ' + str(type(batch_data[0])))
+            print('batch_data: ' + str(type(batch_data[0]['Metadata'])))
+
+
             #print('data: ' + str(data))
             #print('target: ' + str(target))
 
