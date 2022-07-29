@@ -227,7 +227,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             print('num_patches: ' + str(batch_data['num_patches']))
             print('offset: ' + str(batch_data['offset']))
             print('label_transforms: ' + str(batch_data['label_transforms']))
-            exit(0)
+
             #print('data: ' + str(batch_data))
             #exit(0)
             #['metadata', 'metadata_meta_dict', 'metadata_transforms']
@@ -261,7 +261,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
                 print(data.shape[1])
                 print(max_tiles)
                 print(type(data))
-                exit(0)
+
                 if max_tiles is not None and data.shape[1] > max_tiles:
                     # During validation, we want to use all instances/patches
                     # and if its number is very big, we may run out of GPU memory
@@ -458,8 +458,8 @@ def main_worker(gpu, args):
         [
             LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
-            GridPath(
-            #GridPatchd(
+            #GridPath(
+            GridPatchd(
                 keys=["image"],
                 patch_size=(args.tile_size, args.tile_size),
                 threshold=0.999 * 3 * 255 * args.tile_size * args.tile_size,
