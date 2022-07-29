@@ -209,10 +209,6 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
     with torch.no_grad():
 
 
-        print(type(loader))
-
-
-        exit(0)
 
         for idx, batch_data in enumerate(loader):
 
@@ -223,7 +219,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('idx: ' + str(idx))
             #print('batch_data 0: ' + str(type(batch_data)))
             #print('batch_data 1: ' + str(type(batch_data[0])))
-            #print('batch_data 2: ' + str(batch_data[0]['Metadata']))
+            print('batch_data 2: ' + str(batch_data.keys()))
+            exit(0)
             #print('data: ' + str(batch_data))
             #exit(0)
             #['metadata', 'metadata_meta_dict', 'metadata_transforms']
