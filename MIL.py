@@ -214,8 +214,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
 
             #print(epoch, idx, batch_data['image'].numpy().flatten().tolist())
-            print(batch_data)
-            exit(0)
+            #print(batch_data)
+            #exit(0)
 
             #print('batch_data 0: ' + str(batch_data))
             #exit(0)
@@ -237,7 +237,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('patch_location: ' + str(batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray).keys()))
             #print('patch_location2: ' + str(
             #    batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata']))
-            '''
+
             print('patch_location2: ' + str(
                 batch_data['patch_location']))
 
@@ -250,7 +250,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             print('patch_location5: ' + str(type(
                 batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict'][
                     'patch_size'])))
-            '''
+
+            exit(0)
             #print('patch_size: ' + str(batch_data['patch_size']))
             #print('num_patches: ' + str(batch_data['num_patches']))
 
@@ -471,8 +472,7 @@ def main_worker(gpu, args):
                 constant_values=255,
             ),
             ScaleIntensityRanged(keys=["image"], a_min=np.float32(255), a_max=np.float32(0)),
-            #ToTensord(keys=["image", "label"]),
-            ToTensord(keys=["label"]),
+            ToTensord(keys=["image", "label"]),
         ]
     )
 
