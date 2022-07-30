@@ -475,7 +475,7 @@ def main_worker(gpu, args):
     )
 
     dataset_train = Dataset(data=training_list, transform=train_transform)
-    dataset_valid = Dataset(data=validation_list, transform=valid_transform, transform_with_metadata=True)
+    dataset_valid = Dataset(data=validation_list, transform=valid_transform, image_only=False, transform_with_metadata=True)
 
     train_sampler = DistributedSampler(dataset_train) if args.distributed else None
     val_sampler = DistributedSampler(dataset_valid, shuffle=False) if args.distributed else None
