@@ -223,7 +223,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
             #['image', 'label', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms']
             #print('idx: ' + str(idx))
-            #print('batch_data 1: ' + str(type(batch_data[0])))
+            print('batch_data 1: ' + str(type(batch_data[0])))
             #print('original_spatial_shape: ' + str(batch_data['original_spatial_shape']))
             #print('patch_location: ' + str(batch_data['patch_location']))
             #print('patch_size: ' + str(batch_data['patch_size']))
