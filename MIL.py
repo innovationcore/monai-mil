@@ -459,7 +459,7 @@ def main_worker(gpu, args):
 
     valid_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False),
+            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False, transform_with_metadata=True),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             #GridPatch(
             GridPatchd(
