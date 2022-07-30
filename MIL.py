@@ -274,12 +274,23 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
                     for i in range(int(np.ceil(data.shape[1] / float(max_tiles)))):
                         data_slice = data[:, i * max_tiles : (i + 1) * max_tiles]
-                        print(data_slice)
-                        print(type(data_slice))
-                        print(len(data_slice))
+                        #print(data_slice)
+                        #print(type(data_slice))
+                        #print(len(data_slice))
+                        size_T = data_slice.size()
+                        print("size of tensor T:\n", size_T)
+
+                        # Other method to get size using .shape
+                        print("Shape of tensor:\n", data_slice.shape)
+
+                        # Find the number of elements in the tensor "T"
+                        num_T = torch.numel(data_slice)
+                        print("Number of elements in tensor T:\n", num_T)
+
+                        exit(0)
                         logits_slice = model(data_slice, no_head=True)
                         #print(logits_slice)
-                        exit(0)
+
                         logits.append(logits_slice)
 
                         if has_extra_outputs:
