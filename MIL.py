@@ -217,7 +217,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print(batch_data)
             #exit(0)
 
-            #print('batch_data 0: ' + str(batch_data))
+            print('batch_data 0: ' + str(batch_data))
             #exit(0)
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
@@ -235,8 +235,6 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #exit(0)
             #['metadata', 'metadata_meta_dict', 'metadata_transforms']
             #print('patch_location: ' + str(batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray).keys()))
-            print('image: ' + str(
-                batch_data.as_dict("metadata", output_type=np.ndarray)['metadata']))
 
             #print('image: ' + str(
             #    batch_data['image']))
