@@ -459,7 +459,7 @@ def main_worker(gpu, args):
 
     valid_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False, transform_with_metadata=True),
+            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             #GridPatch(
             GridPatchd(
@@ -475,7 +475,7 @@ def main_worker(gpu, args):
     )
 
     dataset_train = Dataset(data=training_list, transform=train_transform)
-    dataset_valid = Dataset(data=validation_list, transform=valid_transform)
+    dataset_valid = Dataset(data=validation_list, transform=valid_transform, transform_with_metadata=True)
 
     train_sampler = DistributedSampler(dataset_train) if args.distributed else None
     val_sampler = DistributedSampler(dataset_valid, shuffle=False) if args.distributed else None
