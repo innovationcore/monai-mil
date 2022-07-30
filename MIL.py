@@ -214,13 +214,14 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
             #print('batch_data 0: ' + str(batch_data.keys()))
             #batch_data 0: dict_keys(['image', 'label', 'image_meta_dict', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms'])
-            print('batch_data[image_meta_dict]: ' + str(batch_data['image_meta_dict']))
-            print('type:batch_data[image_meta_dict]: ' + str(type(batch_data['image_meta_dict'])))
+            #print('batch_data[image_meta_dict]: ' + str(batch_data['image_meta_dict']))
+            #print('type:batch_data[image_meta_dict]: ' + str(type(batch_data['image_meta_dict'])))
 
-            print('batch_data[image_meta_dict].keys: ' + str(batch_data['image_meta_dict'].keys()))
+            #print('batch_data[image_meta_dict].keys: ' + str(batch_data['image_meta_dict'].keys()))
+            #batch_data[image_meta_dict].keys: dict_keys(['backend', 'original_channel_dim', 'spatial_shape',
+            # 'num_patches', 'path', 'patch_location', 'patch_size', 'patch_level', 'filename_or_obj', affine, space])
 
-
-            exit(0)
+            #exit(0)
 
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
