@@ -217,6 +217,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             print('batch_data[image_meta_dict]: ' + str(batch_data['image_meta_dict']))
             print('type:batch_data[image_meta_dict]: ' + str(type(batch_data['image_meta_dict'])))
 
+            print('batch_data[image_meta_dict].keys: ' + str(batch_data['image_meta_dict'].keys()))
+
 
             exit(0)
 
