@@ -212,59 +212,18 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
+            #print('batch_data 0: ' + str(batch_data.keys()))
+            #batch_data 0: dict_keys(['image', 'label', 'image_meta_dict', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms'])
+            print('batch_data[image_meta_dict]: ' + str(batch_data['image_meta_dict']))
+            print('type:batch_data[image_meta_dict]: ' + str(type(batch_data['image_meta_dict'])))
 
-            #print(epoch, idx, batch_data['image'].numpy().flatten().tolist())
-            #print(batch_data)
-            #exit(0)
-
-            print('batch_data 0: ' + str(batch_data.keys()))
-            #exit(0)
-            data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
-
-            #['image', 'label', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms']
-            #print('idx: ' + str(idx))
-            #print('batch_data 1: ' + str(type(batch_data[0])))
-            #print('original_spatial_shape: ' + str(batch_data['original_spatial_shape']))
-            #print('patch_location: ' + str(batch_data['patch_location']))
-            #print('patch_size: ' + str(batch_data['patch_size']))
-            #print('num_patches: ' + str(batch_data['num_patches']))
-            #print('offset: ' + str(batch_data['offset']))
-            #print('label_transforms: ' + str(batch_data['label_transforms']))
-
-            #print('data: ' + str(batch_data))
-            #exit(0)
-            #['metadata', 'metadata_meta_dict', 'metadata_transforms']
-            #print('patch_location: ' + str(batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray).keys()))
-
-            #print('image: ' + str(
-            #    batch_data['image']))
-            '''
-            print('patch_location3: ' + str(
-                batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict']))
-
-            print('patch_location4: ' + str(
-                batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict']['patch_size']))
-
-            print('patch_location5: ' + str(type(
-                batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict'][
-                    'patch_size'])))
-            '''
 
             exit(0)
-            #print('patch_size: ' + str(batch_data['patch_size']))
-            #print('num_patches: ' + str(batch_data['num_patches']))
 
-            #print('batch_data 2: ' + str(type(data)))
+            data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
-
-            #print('data: ' + str(data))
-            #print('target: ' + str(target))
 
             with autocast(enabled=args.amp):
-                #print(data)
-                #print(data.shape[1])
-                #print(max_tiles)
-                #print(type(data))
 
                 if max_tiles is not None and data.shape[1] > max_tiles:
                     # During validation, we want to use all instances/patches
