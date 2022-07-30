@@ -213,12 +213,13 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
-
+            print(loader)
+            print(type(loader))
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
             #['image', 'label', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms']
             #print('idx: ' + str(idx))
-            print('batch_data 0: ' + str(batch_data))
+            #print('batch_data 0: ' + str(batch_data))
             exit(0)
             #print('batch_data 1: ' + str(type(batch_data[0])))
             print('original_spatial_shape: ' + str(batch_data['original_spatial_shape']))
