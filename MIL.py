@@ -213,7 +213,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
         for idx, batch_data in enumerate(loader):
 
 
-            print(epoch, idx, batch_data.data.numpy().flatten().tolist())
+            print(epoch, idx, batch_data.numpy().flatten().tolist())
             exit(0)
 
             #print('batch_data 0: ' + str(batch_data))
