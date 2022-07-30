@@ -218,7 +218,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
             #['image', 'label', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms']
             #print('idx: ' + str(idx))
-            #print('batch_data 0: ' + str(type(batch_data)))
+            print('batch_data 0: ' + str(type(batch_data)))
             #print('batch_data 1: ' + str(type(batch_data[0])))
             print('original_spatial_shape: ' + str(batch_data['original_spatial_shape']))
             print('patch_location: ' + str(batch_data['patch_location']))
@@ -455,7 +455,7 @@ def main_worker(gpu, args):
 
     valid_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True),
+            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             #GridPath(
             GridPatchd(
@@ -469,7 +469,6 @@ def main_worker(gpu, args):
             ToTensord(keys=["image", "label"]),
         ]
     )
-
 
     dataset_train = Dataset(data=training_list, transform=train_transform)
     dataset_valid = Dataset(data=validation_list, transform=valid_transform)
