@@ -217,7 +217,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print(batch_data)
             #exit(0)
 
-            print('batch_data 0: ' + str(type(batch_data)))
+            print('batch_data 0: ' + str(batch_data.keys()))
             #exit(0)
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
