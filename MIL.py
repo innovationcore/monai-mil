@@ -214,8 +214,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
-            print('batch_data 0: ' + str(batch_data))
-            exit(0)
+            #print('batch_data 0: ' + str(batch_data))
+            #exit(0)
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
             #['image', 'label', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms']
@@ -234,6 +234,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('patch_location: ' + str(batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray).keys()))
             #print('patch_location2: ' + str(
             #    batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata']))
+            '''
             print('patch_location2: ' + str(
                 batch_data['patch_location']))
 
@@ -246,7 +247,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             print('patch_location5: ' + str(type(
                 batch_data['patch_location'].as_dict("metadata", output_type=np.ndarray)['metadata_meta_dict'][
                     'patch_size'])))
-
+            '''
             #print('patch_size: ' + str(batch_data['patch_size']))
             #print('num_patches: ' + str(batch_data['num_patches']))
 
@@ -257,10 +258,10 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             #print('target: ' + str(target))
 
             with autocast(enabled=args.amp):
-                print(data)
-                print(data.shape[1])
-                print(max_tiles)
-                print(type(data))
+                #print(data)
+                #print(data.shape[1])
+                #print(max_tiles)
+                #print(type(data))
 
                 if max_tiles is not None and data.shape[1] > max_tiles:
                     # During validation, we want to use all instances/patches
@@ -274,7 +275,9 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
                     for i in range(int(np.ceil(data.shape[1] / float(max_tiles)))):
                         data_slice = data[:, i * max_tiles : (i + 1) * max_tiles]
 
+                        print(data_slice)
                         print(data_slice.cpu().detach().numpy())
+                        print(data.shape[1])
                         exit(0)
                         logits_slice = model(data_slice, no_head=True)
                         logits.append(logits_slice)
@@ -458,8 +461,8 @@ def main_worker(gpu, args):
         [
             LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
-            GridPatch(
-            #GridPatchd(
+            #GridPatch(
+            GridPatchd(
                 keys=["image"],
                 patch_size=(args.tile_size, args.tile_size),
                 threshold=0.999 * 3 * 255 * args.tile_size * args.tile_size,
