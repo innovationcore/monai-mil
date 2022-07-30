@@ -213,7 +213,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
         for idx, batch_data in enumerate(loader):
 
 
-            print(epoch, idx, batch_data['image'].numpy().flatten().tolist())
+            #print(epoch, idx, batch_data['image'].numpy().flatten().tolist())
+            print(batch_data)
             exit(0)
 
             #print('batch_data 0: ' + str(batch_data))
@@ -470,12 +471,13 @@ def main_worker(gpu, args):
                 constant_values=255,
             ),
             ScaleIntensityRanged(keys=["image"], a_min=np.float32(255), a_max=np.float32(0)),
-            ToTensord(keys=["image", "label"]),
+            #ToTensord(keys=["image", "label"]),
+            ToTensord(keys=["label"]),
         ]
     )
 
     dataset_train = Dataset(data=training_list, transform=train_transform)
-    dataset_valid = Dataset(data=validation_list, transform=valid_transform, image_only=False, transform_with_metadata=True)
+    dataset_valid = Dataset(data=validation_list, transform=valid_transform)
 
     train_sampler = DistributedSampler(dataset_train) if args.distributed else None
     val_sampler = DistributedSampler(dataset_valid, shuffle=False) if args.distributed else None
