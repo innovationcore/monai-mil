@@ -22,6 +22,7 @@ from monai.metrics import Cumulative, CumulativeAverage
 from monai.networks.nets import milmodel
 from monai.transforms import (
     Compose,
+    GridPatch,
     GridPatchd,
     LoadImaged,
     MapTransform,
@@ -213,14 +214,11 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
-            print(loader)
-            print(type(loader))
             data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
 
             #['image', 'label', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms']
             #print('idx: ' + str(idx))
-            #print('batch_data 0: ' + str(batch_data))
-            exit(0)
+            print('batch_data 0: ' + str(batch_data))
             #print('batch_data 1: ' + str(type(batch_data[0])))
             print('original_spatial_shape: ' + str(batch_data['original_spatial_shape']))
             print('patch_location: ' + str(batch_data['patch_location']))
@@ -459,8 +457,8 @@ def main_worker(gpu, args):
         [
             LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
-            #GridPath(
-            GridPatchd(
+            GridPatch(
+            #GridPatchd(
                 keys=["image"],
                 patch_size=(args.tile_size, args.tile_size),
                 threshold=0.999 * 3 * 255 * args.tile_size * args.tile_size,
