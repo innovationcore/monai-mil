@@ -212,7 +212,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
-            print('patch location: ' + str(batch_data['patch_location']))
+            print('patch location: ' + str(batch_data['patch_location'][245]))
             #exit(0)
             #print('batch_data 0: ' + str(batch_data.keys()))
             #batch_data 0: dict_keys(['image', 'label', 'image_meta_dict', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms'])
