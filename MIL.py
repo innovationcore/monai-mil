@@ -212,12 +212,6 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
 
         for idx, batch_data in enumerate(loader):
 
-            print(batch_data['patch_location'].numpy()[0][0])
-            print(batch_data['patch_location'].numpy()[0][1])
-            print(batch_data['patch_location'].numpy()[0][2])
-            print(batch_data['patch_location'].numpy()[0][3])
-            print(batch_data['patch_location'].numpy()[0][4])
-
             #print('patch location: ' + str(batch_data['patch_location'].numpy()[0]))
             #exit(0)
             #print('batch_data 0: ' + str(batch_data.keys()))
@@ -271,6 +265,7 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
                         extra_outputs["layer4"] = torch.cat([l[3] for l in logits2], dim=0)
 
                     logits = calc_head(logits)
+                    print('location: ' + str(batch_data['patch_location'].numpy()[0][i]) + str(logits))
 
                 else:
                     # if number of instances is not big, we can run inference directly
