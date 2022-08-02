@@ -215,6 +215,8 @@ def infer_epoch(model, loader, epoch, args, max_tiles=None):
             arry = batch_data['patch_location'].numpy()
             for x in arry:
                 print(x)
+                for xx in x:
+                    print(xx)
             #print('patch location: ' + str(batch_data['patch_location'].numpy()[0]))
             #exit(0)
             #print('batch_data 0: ' + str(batch_data.keys()))
