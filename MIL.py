@@ -4,8 +4,12 @@ import os
 import shutil
 import time
 
+from clearml import Logger
+from clearml import Task
+
 import gdown
 import numpy as np
+import sklearn
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -13,10 +17,12 @@ import torch.nn as nn
 from monai.config import KeysCollection
 from monai.data import Dataset, load_decathlon_datalist
 from monai.data.wsi_reader import WSIReader
+#from monai.data.image_reader import WSIReader
 from monai.metrics import Cumulative, CumulativeAverage
 from monai.networks.nets import milmodel
 from monai.transforms import (
     Compose,
+    GridPatch,
     GridPatchd,
     LoadImaged,
     MapTransform,
@@ -26,7 +32,7 @@ from monai.transforms import (
     ScaleIntensityRanged,
     ToTensord,
 )
-from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import cohen_kappa_score, roc_curve, precision_recall_fscore_support
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
@@ -176,7 +182,133 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
         TARGETS = TARGETS.get_buffer().cpu().numpy()
         qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
 
-    return loss, acc, qwk
+        fpr, tpr, thresholds = roc_curve(TARGETS, PREDS, pos_label=1)
+        auc = sklearn.metrics.auc(fpr, tpr)
+        precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
+
+    return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
+
+def infer_epoch(model, loader, epoch, args, max_tiles=None):
+    """One validation epoch over the dataset"""
+
+    model.eval()
+
+    model2 = model if not args.distributed else model.module
+    has_extra_outputs = model2.mil_mode == "att_trans_pyramid"
+    extra_outputs = model2.extra_outputs
+    calc_head = model2.calc_head
+
+    criterion = nn.BCEWithLogitsLoss()
+
+    run_loss = CumulativeAverage()
+    run_acc = CumulativeAverage()
+    PREDS = Cumulative()
+    TARGETS = Cumulative()
+
+    start_time = time.time()
+    loss, acc = 0.0, 0.0
+
+    with torch.no_grad():
+
+        for idx, batch_data in enumerate(loader):
+
+            #print('patch location: ' + str(batch_data['patch_location'].numpy()[0]))
+            #exit(0)
+            #print('batch_data 0: ' + str(batch_data.keys()))
+            #batch_data 0: dict_keys(['image', 'label', 'image_meta_dict', 'original_spatial_shape', patch_location, patch_size, num_patches, 'offset', 'label_transforms'])
+            #print('batch_data[image_meta_dict]: ' + str(batch_data['image_meta_dict']))
+            #print('type:batch_data[image_meta_dict]: ' + str(type(batch_data['image_meta_dict'])))
+
+            #print('batch_data[image_meta_dict].keys: ' + str(batch_data['image_meta_dict'].keys()))
+            #batch_data[image_meta_dict].keys: dict_keys(['backend', 'original_channel_dim', 'spatial_shape',
+            # 'num_patches', 'path', 'patch_location', 'patch_size', 'patch_level', 'filename_or_obj', affine, space])
+
+            #exit(0)
+
+            data, target = batch_data["image"].cuda(args.rank), batch_data["label"].cuda(args.rank)
+
+
+            with autocast(enabled=args.amp):
+
+                if max_tiles is not None and data.shape[1] > max_tiles:
+                    # During validation, we want to use all instances/patches
+                    # and if its number is very big, we may run out of GPU memory
+                    # in this case, we first iteratively go over subsets of patches to calculate backbone features
+                    # and at the very end calculate the classification output
+
+                    logits = []
+                    logits2 = []
+
+                    for i in range(int(np.ceil(data.shape[1] / float(max_tiles)))):
+                        data_slice = data[:, i * max_tiles : (i + 1) * max_tiles]
+
+                        logits_slice = model(data_slice, no_head=True)
+                        #print(logits_slice)
+
+                        print('location: ' + str(batch_data['patch_location'].numpy()[0][i]) + str(logits_slice))
+
+                        logits.append(logits_slice)
+
+                        if has_extra_outputs:
+                            logits2.append(
+                                [
+                                    extra_outputs["layer1"],
+                                    extra_outputs["layer2"],
+                                    extra_outputs["layer3"],
+                                    extra_outputs["layer4"],
+                                ]
+                            )
+
+                    logits = torch.cat(logits, dim=1)
+
+
+
+                    if has_extra_outputs:
+                        extra_outputs["layer1"] = torch.cat([l[0] for l in logits2], dim=0)
+                        extra_outputs["layer2"] = torch.cat([l[1] for l in logits2], dim=0)
+                        extra_outputs["layer3"] = torch.cat([l[2] for l in logits2], dim=0)
+                        extra_outputs["layer4"] = torch.cat([l[3] for l in logits2], dim=0)
+
+                    logits = calc_head(logits)
+
+
+                else:
+                    # if number of instances is not big, we can run inference directly
+                    logits = model(data)
+
+                loss = criterion(logits, target)
+
+            pred = logits.sigmoid().sum(1).detach().round()
+            target = target.sum(1).round()
+            acc = (pred == target).float().mean()
+
+            run_loss.append(loss)
+            run_acc.append(acc)
+            loss = run_loss.aggregate()
+            acc = run_acc.aggregate()
+
+            PREDS.extend(pred)
+            TARGETS.extend(target)
+
+            if args.rank == 0:
+                print(
+                    "Val epoch {}/{} {}/{}".format(epoch, args.epochs, idx, len(loader)),
+                    "loss: {:.4f}".format(loss),
+                    "acc: {:.4f}".format(acc),
+                    "time {:.2f}s".format(time.time() - start_time),
+                )
+            start_time = time.time()
+
+        # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
+        PREDS = PREDS.get_buffer().cpu().numpy()
+        TARGETS = TARGETS.get_buffer().cpu().numpy()
+        qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
+
+        fpr, tpr, thresholds = roc_curve(TARGETS, PREDS, pos_label=1)
+        auc = sklearn.metrics.auc(fpr, tpr)
+        precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
+
+    return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
 
 
 def save_checkpoint(model, epoch, args, filename="model.pt", best_acc=0):
@@ -237,6 +369,7 @@ def list_data_collate(batch: collections.abc.Sequence):
     for i, item in enumerate(batch):
         data = item[0]
         data["image"] = torch.stack([ix["image"] for ix in item], dim=0)
+        data["patch_location"] = torch.stack([ix["patch_location"] for ix in item], dim=0)
         batch[i] = data
     return default_collate(batch)
 
@@ -298,8 +431,9 @@ def main_worker(gpu, args):
 
     valid_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True),
+            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
+            #GridPatch(
             GridPatchd(
                 keys=["image"],
                 patch_size=(args.tile_size, args.tile_size),
@@ -323,7 +457,7 @@ def main_worker(gpu, args):
         batch_size=args.batch_size,
         shuffle=(train_sampler is None),
         num_workers=args.workers,
-        pin_memory=True,
+        pin_memory=False,
         multiprocessing_context="spawn",
         sampler=train_sampler,
         collate_fn=list_data_collate,
@@ -333,7 +467,7 @@ def main_worker(gpu, args):
         batch_size=1,
         shuffle=False,
         num_workers=args.workers,
-        pin_memory=True,
+        pin_memory=False,
         multiprocessing_context="spawn",
         sampler=val_sampler,
         collate_fn=list_data_collate,
@@ -342,7 +476,8 @@ def main_worker(gpu, args):
     if args.rank == 0:
         print("Dataset training:", len(dataset_train), "validation:", len(dataset_valid))
 
-    model = milmodel.MILModel(num_classes=args.num_classes, pretrained=True, mil_mode=args.mil_mode)
+    #model = milmodel.MILModel(backbone="resnet50", pretrained=True, num_classes=args.num_classes, mil_mode=args.mil_mode)
+    model = milmodel.MILModel(pretrained=True, num_classes=args.num_classes, mil_mode=args.mil_mode)
 
     best_acc = 0
     start_epoch = 0
@@ -364,7 +499,25 @@ def main_worker(gpu, args):
     if args.validate:
         # if we only want to validate existing checkpoint
         epoch_time = time.time()
-        val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        #val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+
+        if args.rank == 0:
+            print(
+                "Final validation loss: {:.4f}".format(val_loss),
+                "acc: {:.4f}".format(val_acc),
+                "qwk: {:.4f}".format(qwk),
+                "time {:.2f}s".format(time.time() - epoch_time),
+            )
+
+        exit(0)
+
+    if args.infer:
+        # if we only want to validate existing checkpoint
+        epoch_time = time.time()
+        #val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = infer_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+
         if args.rank == 0:
             print(
                 "Final validation loss: {:.4f}".format(val_loss),
@@ -433,15 +586,35 @@ def main_worker(gpu, args):
         if (epoch + 1) % args.val_every == 0:
 
             epoch_time = time.time()
-            val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
+            #val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
+            val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
             if args.rank == 0:
                 print(
                     "Final validation  {}/{}".format(epoch, n_epochs - 1),
                     "loss: {:.4f}".format(val_loss),
                     "acc: {:.4f}".format(val_acc),
+                    "auc: {:.4f}".format(auc),
+                    "precision: {:.4f}".format(precision),
+                    "recall: {:.4f}".format(recall),
                     "qwk: {:.4f}".format(qwk),
                     "time {:.2f}s".format(time.time() - epoch_time),
                 )
+
+                #send to clearml
+
+                Logger.current_logger().report_scalar("ACC", "val_acc", iteration=epoch,
+                                                      value=val_acc)
+                Logger.current_logger().report_scalar("Loss", "val_loss", iteration=epoch,
+                                                      value=val_loss)
+                Logger.current_logger().report_scalar("AUC", "val_auc", iteration=epoch,
+                                                      value=auc)
+                Logger.current_logger().report_scalar("Precision", "val_precision", iteration=epoch,
+                                                      value=precision)
+                Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch,
+                                                      value=recall)
+                Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch,
+                                                      value=fbeta_score)
+
                 if writer is not None:
                     writer.add_scalar("val_loss", val_loss, epoch)
                     writer.add_scalar("val_acc", val_acc, epoch)
@@ -487,6 +660,12 @@ def parse_args():
         help="run only inference on the validation set, must specify the checkpoint argument",
     )
 
+    parser.add_argument(
+        "--infer",
+        action="store_true",
+        help="run only inference on the inference set, must specify the checkpoint argument",
+    )
+
     parser.add_argument("--logdir", default=None, help="path to log directory to store Tensorboard logs")
 
     parser.add_argument("--epochs", default=50, type=int, help="number of training epochs")
@@ -516,6 +695,9 @@ def parse_args():
         "--quick", action="store_true", help="use a small subset of data for debugging"
     )  # for debugging
 
+    parser.add_argument('--project_name', type=str, default='monai-mil', help='name of project')
+    parser.add_argument('--task_name', type=str, default='monai-mil_template', help='name of task')
+
     args = parser.parse_args()
 
     print("Argument values:")
@@ -530,13 +712,10 @@ if __name__ == "__main__":
 
     args = parse_args()
 
+    task = Task.init(project_name=args.project_name, task_name=args.task_name)
+
     if args.dataset_json is None:
-        # download default json datalist
-        resource = "https://drive.google.com/uc?id=1L6PtKBlHHyUgTE4rVhRuOLTQKgD4tBRK"
-        dst = "./datalist_panda_0.json"
-        if not os.path.exists(dst):
-            gdown.download(resource, dst, quiet=False)
-        args.dataset_json = dst
+        print('Error: no dataset specified')
 
     if args.distributed:
         ngpus_per_node = torch.cuda.device_count()
