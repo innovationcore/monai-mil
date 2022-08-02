@@ -411,7 +411,8 @@ def main_worker(gpu, args):
 
     train_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True),
+            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8,
+                       level=args.wsi_level, image_only=True),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             RandGridPatchd(
                 keys=["image"],
@@ -425,13 +426,14 @@ def main_worker(gpu, args):
             RandFlipd(keys=["image"], spatial_axis=1, prob=0.5),
             RandRotate90d(keys=["image"], prob=0.5),
             ScaleIntensityRanged(keys=["image"], a_min=np.float32(255), a_max=np.float32(0)),
-            ToTensord(keys=["image", "label"]),
+            ToTensord(keys=["image", "label", "patch_location"]),
         ]
     )
 
     valid_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=False),
+            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8,
+                       level=args.wsi_level, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             #GridPatch(
             GridPatchd(
@@ -442,7 +444,7 @@ def main_worker(gpu, args):
                 constant_values=255,
             ),
             ScaleIntensityRanged(keys=["image"], a_min=np.float32(255), a_max=np.float32(0)),
-            ToTensord(keys=["image", "label"]),
+            ToTensord(keys=["image", "label", "patch_location"]),
         ]
     )
 
@@ -697,6 +699,7 @@ def parse_args():
 
     parser.add_argument('--project_name', type=str, default='monai-mil', help='name of project')
     parser.add_argument('--task_name', type=str, default='monai-mil_template', help='name of task')
+    parser.add_argument('--wsi_level', type=int, default=1, help='whole slide level to extract (default 1)')
 
     args = parser.parse_args()
 
