@@ -103,6 +103,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
     run_loss = CumulativeAverage()
     run_acc = CumulativeAverage()
+    PROBS = Cumulative()
     PREDS = Cumulative()
     TARGETS = Cumulative()
 
@@ -156,7 +157,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
                 loss = criterion(logits, target)
 
-            pred = logits.sigmoid().sum(1).detach().round()
+            prob = logits.sigmoid().detach()
+            pred = prob.sum(1).round()
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
 
@@ -165,6 +167,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             loss = run_loss.aggregate()
             acc = run_acc.aggregate()
 
+            PROBS.extend(prob)
             PREDS.extend(pred)
             TARGETS.extend(target)
 
@@ -178,12 +181,27 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             start_time = time.time()
 
         # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
+        PROBS = PROBS.get_buffer().cpu().numpy().flatten()
         PREDS = PREDS.get_buffer().cpu().numpy()
         TARGETS = TARGETS.get_buffer().cpu().numpy()
         qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
-
-        fpr, tpr, thresholds = roc_curve(TARGETS, PREDS, pos_label=1)
-        auc = sklearn.metrics.auc(fpr, tpr)
+        if args.num_classes == 1:
+            fpr, tpr, thresholds = roc_curve(TARGETS, PROBS, pos_label=1)
+            auc = sklearn.metrics.auc(fpr, tpr)
+        else:
+            # Those are not well-defined for non-binary classification (maybe they can be if you can threshold along
+            #  a continuous parameter), and the network outputs probabilities only in case num_classes == 1. Otherwise
+            #  the PROBS array contains some numbers that sum to the label integer (rounded), and cannot be interpreted
+            #  as probability without changing the approach set by LabelEncodeIntegerGraded.
+            fpr, tpr, thresholds = -1, -1, []
+            auc = -1
+        if args.rank == 0:
+            print(f'{PROBS=}')
+            print(f'{PREDS}')
+            print(f'{TARGETS=}')
+            print(f'{fpr=}')
+            print(f'{tpr=}')
+            print(f'{thresholds=}')
         precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
 
     return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
