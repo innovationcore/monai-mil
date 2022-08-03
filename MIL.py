@@ -37,6 +37,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
+import platform
 
 
 def train_epoch(model, loader, optimizer, scaler, epoch, args):
@@ -427,9 +428,11 @@ def main_worker(gpu, args):
         training_list = training_list[:16]
         validation_list = validation_list[:16]
 
+    backend = "openslide" if platform.system() == "Windows" else "cucim"
+
     train_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8,
+            LoadImaged(keys=["image"], reader=WSIReader, backend=backend, dtype=np.uint8,
                        level=args.wsi_level, image_only=True),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             RandGridPatchd(
@@ -450,7 +453,7 @@ def main_worker(gpu, args):
 
     valid_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8,
+            LoadImaged(keys=["image"], reader=WSIReader, backend=backend, dtype=np.uint8,
                        level=args.wsi_level, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             #GridPatch(
@@ -478,7 +481,7 @@ def main_worker(gpu, args):
         shuffle=(train_sampler is None),
         num_workers=args.workers,
         pin_memory=False,
-        multiprocessing_context="spawn",
+        multiprocessing_context="spawn" if args.workers > 0 else None,
         sampler=train_sampler,
         collate_fn=list_data_collate,
     )
@@ -488,7 +491,7 @@ def main_worker(gpu, args):
         shuffle=False,
         num_workers=args.workers,
         pin_memory=False,
-        multiprocessing_context="spawn",
+        multiprocessing_context="spawn" if args.workers > 0 else None,
         sampler=val_sampler,
         collate_fn=list_data_collate,
     )
