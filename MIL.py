@@ -104,6 +104,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
     run_loss = CumulativeAverage()
     run_acc = CumulativeAverage()
+    FILES = []  # TODO(avirodov): this is probably not good for multiprocessing.
     PROBS = Cumulative()
     PREDS = Cumulative()
     TARGETS = Cumulative()
@@ -171,6 +172,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             PROBS.extend(prob)
             PREDS.extend(pred)
             TARGETS.extend(target)
+            FILES.extend(batch_data["image_name"])
 
             if args.rank == 0:
                 print(
@@ -182,10 +184,12 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             start_time = time.time()
 
         # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
+        # TODO(avirodov): PROBS should not be flattened if num_classes > 1 !
         PROBS = PROBS.get_buffer().cpu().numpy().flatten()
         PREDS = PREDS.get_buffer().cpu().numpy()
         TARGETS = TARGETS.get_buffer().cpu().numpy()
         qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
+
         if args.num_classes == 1:
             fpr, tpr, thresholds = roc_curve(TARGETS, PROBS, pos_label=1)
             auc = sklearn.metrics.auc(fpr, tpr)
@@ -197,12 +201,21 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             fpr, tpr, thresholds = -1, -1, []
             auc = -1
         if args.rank == 0:
+            print(f'{FILES=}')
             print(f'{PROBS=}')
-            print(f'{PREDS}')
+            print(f'{PREDS=}')
             print(f'{TARGETS=}')
             print(f'{fpr=}')
             print(f'{tpr=}')
             print(f'{thresholds=}')
+
+        fp = open(os.path.join('.', f'predictions_val.csv'), 'w')
+        fp.write('file,target,prediction,probability\n')
+        for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
+            fp.write(f'{a_file},{a_target},{int(a_prob >= 0.5)},{a_prob}\n')
+        fp.close()
+        exit(0)
+
         precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
 
     return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
@@ -346,6 +359,12 @@ def main_worker(gpu, args):
             ToTensord(keys=["image", "label", "patch_location"]),
         ]
     )
+
+    # Preserve file names for visualization
+    for dict in training_list:
+        dict["image_name"] = dict["image"]
+    for dict in validation_list:
+        dict["image_name"] = dict["image"]
 
     dataset_train = Dataset(data=training_list, transform=train_transform)
     dataset_valid = Dataset(data=validation_list, transform=valid_transform)
