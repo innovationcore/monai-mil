@@ -112,7 +112,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
     start_time = time.time()
     loss, acc = 0.0, 0.0
 
-    with torch.no_grad():
+    with torch.no_grad(), open(os.path.join('.', f'tile_predictions_val.csv'), 'w') as tile_fp:
+        tile_fp.write('file,tile_x,tile_y,probability\n')
 
         for idx, batch_data in enumerate(loader):
 
@@ -151,14 +152,20 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                         extra_outputs["layer3"] = torch.cat([l[2] for l in logits2], dim=0)
                         extra_outputs["layer4"] = torch.cat([l[3] for l in logits2], dim=0)
 
+                    tile_logits = logits
+                    tile_logits = model2.myfc(tile_logits)
                     logits = calc_head(logits)
 
                 else:
                     # if number of instances is not big, we can run inference directly
-                    logits = model(data)
+                    tile_logits = model2(data, no_head=True)
+                    tile_logits = model2.myfc(tile_logits)
+                    logits = calc_head(logits)
 
                 loss = criterion(logits, target)
 
+            tile_prob = tile_logits.sigmoid().detach()
+            tile_pred = tile_prob.sum(2).round()
             prob = logits.sigmoid().detach()
             pred = prob.sum(1).round()
             target = target.sum(1).round()
@@ -181,6 +188,19 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                     "acc: {:.4f}".format(acc),
                     "time {:.2f}s".format(time.time() - start_time),
                 )
+
+                tile_logits = tile_logits.cpu()
+                for i, image_name in enumerate(batch_data["image_name"]):
+                    print(f'{i=} {image_name=}')
+                    for j in range(tile_logits.shape[1]):
+                        tile_fp.write(f'{image_name},'
+                                      f'{batch_data["patch_location"][i, j, 0]},'
+                                      f'{batch_data["patch_location"][i, j, 1]},'
+                                      f'{tile_prob[i, j].item()}\n')
+                        #print(f'{j=} coords={batch_data["patch_location"][i, j].numpy()}'
+                        #      f' logits={tile_logits[i, j].numpy()} {tile_prob[i, j]=} {tile_pred[i, j]=}')
+                print(f'done with image')
+
             start_time = time.time()
 
         # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
@@ -214,7 +234,6 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
         for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
             fp.write(f'{a_file},{a_target},{int(a_prob >= 0.5)},{a_prob}\n')
         fp.close()
-        exit(0)
 
         precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
 
