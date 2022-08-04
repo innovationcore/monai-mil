@@ -113,7 +113,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
     loss, acc = 0.0, 0.0
 
     with torch.no_grad(), open(os.path.join('.', f'tile_predictions_val.csv'), 'w') as tile_fp:
-        tile_fp.write('file,tile_x,tile_y,probability\n')
+        tile_fp.write('file,tile_x,tile_y,class,attention\n')
 
         for idx, batch_data in enumerate(loader):
 
@@ -152,12 +152,31 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                         extra_outputs["layer3"] = torch.cat([l[2] for l in logits2], dim=0)
                         extra_outputs["layer4"] = torch.cat([l[3] for l in logits2], dim=0)
 
-                    tile_logits = logits
+                    tile_logits = logits.clone()
+
+                    if model2.mil_mode == "att":
+                        # TODO(avirodov): any way to not copy-paste from model?
+                        attention = model2.attention(tile_logits)
+                        attention = torch.softmax(attention, dim=1)
+
+                    elif model2.mil_mode == "att_trans" and model2.transformer is not None:
+                        # TODO(avirodov): any way to not copy-paste from model?
+                        tile_logits = tile_logits.permute(1, 0, 2)
+                        tile_logits = model2.transformer(tile_logits)
+                        tile_logits = tile_logits.permute(1, 0, 2)
+
+                        attention = model2.attention(tile_logits)
+                        attention = torch.softmax(attention, dim=1)
+                    else:
+                        raise NotImplemented("Need to implement attention as vector for mean/max") # TODO(avirodov): do it.
+                        attention = 0
+
                     tile_logits = model2.myfc(tile_logits)
                     logits = calc_head(logits)
 
                 else:
                     # if number of instances is not big, we can run inference directly
+                    raise NotImplemented("Need to support attention/transformer here.")
                     tile_logits = model2(data, no_head=True)
                     tile_logits = model2.myfc(tile_logits)
                     logits = calc_head(logits)
@@ -194,10 +213,11 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                     print(f'{i=} {image_name=}')
                     for j in range(tile_logits.shape[1]):
                         tile_fp.write(f'{image_name},'
-                                      f'{batch_data["patch_location"][i, j, 0]},'
-                                      f'{batch_data["patch_location"][i, j, 1]},'
-                                      f'{tile_prob[i, j].item()}\n')
-                        #print(f'{j=} coords={batch_data["patch_location"][i, j].numpy()}'
+                                     f'{batch_data["patch_location"][i, j, 0]},'
+                                     f'{batch_data["patch_location"][i, j, 1]},'
+                                     f'{tile_pred[i, j].item()},'
+                                     f'{attention[i, j].item()}\n')
+                        # print(f'{j=} coords={batch_data["patch_location"][i, j].numpy()}'
                         #      f' logits={tile_logits[i, j].numpy()} {tile_prob[i, j]=} {tile_pred[i, j]=}')
                 print(f'done with image')
 
