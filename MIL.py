@@ -160,6 +160,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                     tile_logits = model2(data, no_head=True)
                     tile_logits = model2.myfc(tile_logits)
                     logits = calc_head(logits)
+                    raise RuntimeError("possible bug")
 
                 loss = criterion(logits, target)
 
