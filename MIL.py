@@ -1,5 +1,6 @@
 import argparse
 import collections.abc
+import json
 import os
 import shutil
 import time
@@ -228,6 +229,30 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             print(f'{fpr=}')
             print(f'{tpr=}')
             print(f'{thresholds=}')
+
+        prediction_map = dict()
+        prediction_file_path = 'predictions_val.json'
+        if os.path.exists(prediction_file_path):
+            with open(prediction_file_path, 'r') as f:
+                prediction_map = json.load(f)
+
+        if epoch not in prediction_map:
+            prediction_map[epoch] = []
+
+        for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
+            pred_file = dict()
+            pred_file['file_path'] = a_file
+            pred_file['target'] = a_target
+            pred_file['prediction'] = int(a_prob >= 0.5)
+            pred_file['probability'] = a_prob
+            if pred_file['target'] != pred_file['prediction']:
+                pred_file['correct'] = False
+            else:
+                pred_file['correct'] = True
+            prediction_map[epoch].append(pred_file)
+
+        with open(prediction_file_path, 'w') as json_file:
+            json.dump(prediction_map, json_file, indent=4)
 
         fp = open(os.path.join('.', f'predictions_val.csv'), 'w')
         fp.write('file,target,prediction,probability\n')
