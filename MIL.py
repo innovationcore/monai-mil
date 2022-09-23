@@ -103,13 +103,16 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
     run_loss = CumulativeAverage()
     run_acc = CumulativeAverage()
+    FILES = []  # TODO(avirodov): this is probably not good for multiprocessing.
+    PROBS = Cumulative()
     PREDS = Cumulative()
     TARGETS = Cumulative()
 
     start_time = time.time()
     loss, acc = 0.0, 0.0
 
-    with torch.no_grad():
+    with torch.no_grad(), open(os.path.join('.', f'tile_predictions_val.csv'), 'w') as tile_fp:
+        tile_fp.write('file,tile_x,tile_y,probability\n')
 
         for idx, batch_data in enumerate(loader):
 
@@ -148,15 +151,22 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                         extra_outputs["layer3"] = torch.cat([l[2] for l in logits2], dim=0)
                         extra_outputs["layer4"] = torch.cat([l[3] for l in logits2], dim=0)
 
+                    tile_logits = logits
+                    tile_logits = model2.myfc(tile_logits)
                     logits = calc_head(logits)
 
                 else:
                     # if number of instances is not big, we can run inference directly
-                    logits = model(data)
+                    tile_logits = model2(data, no_head=True)
+                    tile_logits = model2.myfc(tile_logits)
+                    logits = calc_head(logits)
 
                 loss = criterion(logits, target)
 
-            pred = logits.sigmoid().sum(1).detach().round()
+            tile_prob = tile_logits.sigmoid().detach()
+            tile_pred = tile_prob.sum(2).round()
+            prob = logits.sigmoid().detach()
+            pred = prob.sum(1).round()
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
 
@@ -165,8 +175,10 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             loss = run_loss.aggregate()
             acc = run_acc.aggregate()
 
+            PROBS.extend(prob)
             PREDS.extend(pred)
             TARGETS.extend(target)
+            FILES.extend(batch_data["image_name"])
 
             if args.rank == 0:
                 print(
@@ -175,15 +187,53 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                     "acc: {:.4f}".format(acc),
                     "time {:.2f}s".format(time.time() - start_time),
                 )
+
+                tile_logits = tile_logits.cpu()
+                for i, image_name in enumerate(batch_data["image_name"]):
+                    print(f'{i=} {image_name=}')
+                    for j in range(tile_logits.shape[1]):
+                        tile_fp.write(f'{image_name},'
+                                      f'{batch_data["patch_location"][i, j, 0]},'
+                                      f'{batch_data["patch_location"][i, j, 1]},'
+                                      f'{tile_prob[i, j].item()}\n')
+                        #print(f'{j=} coords={batch_data["patch_location"][i, j].numpy()}'
+                        #      f' logits={tile_logits[i, j].numpy()} {tile_prob[i, j]=} {tile_pred[i, j]=}')
+                print(f'done with image')
+
             start_time = time.time()
 
         # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
+        # TODO(avirodov): PROBS should not be flattened if num_classes > 1 !
+        PROBS = PROBS.get_buffer().cpu().numpy().flatten()
         PREDS = PREDS.get_buffer().cpu().numpy()
         TARGETS = TARGETS.get_buffer().cpu().numpy()
         qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
 
-        fpr, tpr, thresholds = roc_curve(TARGETS, PREDS, pos_label=1)
-        auc = sklearn.metrics.auc(fpr, tpr)
+        if args.num_classes == 1:
+            fpr, tpr, thresholds = roc_curve(TARGETS, PROBS, pos_label=1)
+            auc = sklearn.metrics.auc(fpr, tpr)
+        else:
+            # Those are not well-defined for non-binary classification (maybe they can be if you can threshold along
+            #  a continuous parameter), and the network outputs probabilities only in case num_classes == 1. Otherwise
+            #  the PROBS array contains some numbers that sum to the label integer (rounded), and cannot be interpreted
+            #  as probability without changing the approach set by LabelEncodeIntegerGraded.
+            fpr, tpr, thresholds = -1, -1, []
+            auc = -1
+        if args.rank == 0:
+            print(f'{FILES=}')
+            print(f'{PROBS=}')
+            print(f'{PREDS=}')
+            print(f'{TARGETS=}')
+            print(f'{fpr=}')
+            print(f'{tpr=}')
+            print(f'{thresholds=}')
+
+        fp = open(os.path.join('.', f'predictions_val.csv'), 'w')
+        fp.write('file,target,prediction,probability\n')
+        for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
+            fp.write(f'{a_file},{a_target},{int(a_prob >= 0.5)},{a_prob}\n')
+        fp.close()
+
         precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1, average="weighted")
 
     return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
@@ -443,6 +493,12 @@ def main_worker(gpu, args):
             ToTensord(keys=["image", "label"]),
         ]
     )
+
+    # Preserve file names for visualization
+    for dict in training_list:
+        dict["image_name"] = dict["image"]
+    for dict in validation_list:
+        dict["image_name"] = dict["image"]
 
     dataset_train = Dataset(data=training_list, transform=train_transform)
     dataset_valid = Dataset(data=validation_list, transform=valid_transform)
