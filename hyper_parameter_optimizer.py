@@ -72,6 +72,7 @@ an_optimizer = HyperParameterOptimizer(
         UniformIntegerParameterRange('Args/epochs', min_value=3, max_value=150, step_size=5),
         UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=3, step_size=1),
         UniformIntegerParameterRange('Args/tile_count', min_value=1, max_value=40, step_size=2),
+        UniformIntegerParameterRange('Args/tile_size', min_value=256, max_value=2048, step_size=256),
 
         UniformParameterRange('Args/learning_rate', min_value=0.000001, max_value=0.0001),
 
