@@ -85,7 +85,7 @@ an_optimizer = HyperParameterOptimizer(
 
     # this is the objective metric we want to maximize/minimize
     objective_metric_title='Loss',
-    objective_metric_series='loss',
+    objective_metric_series='val_loss',
 
     #big label
     #objective_metric_title='accuracy',
