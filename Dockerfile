@@ -3,6 +3,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN pip3 install clearml
 RUN pip3 install clearml-agent
+RUN pip3 install optuna
 ADD clearml.conf /root
 
 #update api
