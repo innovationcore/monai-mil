@@ -1,7 +1,12 @@
 FROM projectmonai/monai:0.9.1
+ARG DEBIAN_FRONTEND=noninteractive
+
 RUN pip3 install clearml
 RUN pip3 install clearml-agent
 ADD clearml.conf /root
+
+#update api
+RUN apt-get update
 
 #buildopenslide
 RUN apt-get install build-essential -y
