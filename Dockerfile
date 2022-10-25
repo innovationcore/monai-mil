@@ -7,6 +7,11 @@ ADD clearml.conf /root
 
 #update api
 RUN apt-get update
+RUN apt-get install openslide-tools -y
+RUN apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get install -y curl
+RUN apt-get install -y unzip
+RUN apt-get install -y libtiff5-dev
 
 #buildopenslide
 RUN apt-get install build-essential -y
