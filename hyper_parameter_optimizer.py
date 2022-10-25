@@ -45,8 +45,8 @@ def job_complete_callback(
 
 
 # Connecting TRAINS
-task = Task.init(project_name='transformer-text-classification',
-                 task_name='HPO-text-classification',
+task = Task.init(project_name='monai-mil',
+                 task_name='HPO-Monai-MIL',
                  task_type=Task.TaskTypes.optimizer,
                  reuse_last_task_id=False)
 
