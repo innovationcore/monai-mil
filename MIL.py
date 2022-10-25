@@ -800,6 +800,7 @@ if __name__ == "__main__":
 
     task = Task.init(project_name=args.project_name, task_name=args.task_name)
 
+
     if args.dataset_json is None:
         print('Error: no dataset specified')
 
