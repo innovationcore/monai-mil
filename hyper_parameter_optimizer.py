@@ -93,7 +93,7 @@ an_optimizer = HyperParameterOptimizer(
     #objective_metric_series='total',
 
     # now we decide if we want to maximize it or minimize it (accuracy we maximize)
-    objective_metric_sign='max',
+    objective_metric_sign='min',
     # let us limit the number of concurrent experiments,
     # this in turn will make sure we do dont bombard the scheduler with experiments.
     # if we have an auto-scaler connected, this, by proxy, will limit the number of machine
