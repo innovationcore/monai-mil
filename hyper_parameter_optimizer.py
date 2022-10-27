@@ -76,7 +76,7 @@ an_optimizer = HyperParameterOptimizer(
 
         UniformParameterRange('Args/optim_lr', min_value=0.000001, max_value=0.0001),
 
-        DiscreteParameterRange('Args/mil_mode', values=['mean', 'max', 'att', 'att_trans', 'att_trans_pyramid']),
+        DiscreteParameterRange('Args/mil_mode', values=['mean', 'max', 'att', 'att_trans']),
 
         #DiscreteParameterRange('Args/train_file', values=["/workspace/path_train.csv"]),
         #DiscreteParameterRange('Args/validation_file', values=["/workspace/path_val.csv"]),
