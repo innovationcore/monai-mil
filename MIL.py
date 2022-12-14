@@ -109,7 +109,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
     start_time = time.time()
     loss, acc = 0.0, 0.0
 
-    with torch.no_grad():
+    with torch.no_grad(), open(os.path.join('.', f'tile_predictions_val.csv'), 'w') as tile_fp:
+        tile_fp.write('file,tile_x,tile_y,probability\n')
 
         for idx, batch_data in enumerate(loader):
 
@@ -118,7 +119,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
             with autocast(enabled=args.amp):
 
-                if max_tiles is not None and data.shape[1] > max_tiles:
+                if (max_tiles is not None and data.shape[1] > max_tiles) or True:
                     # During validation, we want to use all instances/patches
                     # and if its number is very big, we may run out of GPU memory
                     # in this case, we first iteratively go over subsets of patches to calculate backbone features
@@ -149,14 +150,21 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                         extra_outputs["layer3"] = torch.cat([l[2] for l in logits2], dim=0)
                         extra_outputs["layer4"] = torch.cat([l[3] for l in logits2], dim=0)
 
+                    tile_logits = logits
+                    tile_logits = model2.myfc(tile_logits)
                     logits = calc_head(logits)
 
                 else:
                     # if number of instances is not big, we can run inference directly
-                    logits = model(data)
+                    tile_logits = model2(data, no_head=True)
+                    tile_logits = model2.myfc(tile_logits)
+                    logits = calc_head(logits)
+                    raise RuntimeError("possible bug, not sure avirodov got the head setup correctly here.")
 
                 loss = criterion(logits, target)
 
+            tile_prob = tile_logits.sigmoid().detach()
+            tile_pred = tile_prob.sum(2).round()
             prob = logits.sigmoid().detach()
             pred = logits.sigmoid().sum(1).detach().round()
             target = target.sum(1).round()
@@ -179,6 +187,17 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                     "acc: {:.4f}".format(acc),
                     "time {:.2f}s".format(time.time() - start_time),
                 )
+
+                tile_logits = tile_logits.cpu()
+                for i, image_name in enumerate(batch_data["image_name"]):
+                    print(f'{i=} {image_name=}')
+                    for j in range(tile_logits.shape[1]):
+                        tile_fp.write(f'{image_name},'
+                                      f'{batch_data["patch_location"][i, 0, j]},'
+                                      f'{batch_data["patch_location"][i, 1, j]},'
+                                      f'{tile_prob[i, j].item()}\n')
+                print(f'done with image')
+
             start_time = time.time()
 
         # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
