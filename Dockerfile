@@ -1,4 +1,4 @@
-FROM projectmonai/monai:0.9.1
+FROM projectmonai/monai:latest
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN pip3 install clearml
