@@ -3,6 +3,7 @@ import collections.abc
 import os
 import shutil
 import time
+import json
 
 import gdown
 import numpy as np
@@ -27,11 +28,15 @@ from monai.transforms import (
     SplitDimd,
     ToTensord,
 )
-from sklearn.metrics import cohen_kappa_score
+import sklearn
+from sklearn.metrics import cohen_kappa_score, roc_curve, precision_recall_fscore_support
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
+
+from clearml import Logger
+from clearml import Task
 
 
 def train_epoch(model, loader, optimizer, scaler, epoch, args):
@@ -95,6 +100,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
     run_loss = CumulativeAverage()
     run_acc = CumulativeAverage()
+    FILES = []  # TODO(avirodov): this is probably not good for multiprocessing.
+    PROBS = Cumulative()
     PREDS = Cumulative()
     TARGETS = Cumulative()
 
@@ -149,6 +156,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
                 loss = criterion(logits, target)
 
+            prob = logits.sigmoid().detach()
             pred = logits.sigmoid().sum(1).detach().round()
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
@@ -158,8 +166,10 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             loss = run_loss.aggregate()
             acc = run_acc.aggregate()
 
+            PROBS.extend(prob)
             PREDS.extend(pred)
             TARGETS.extend(target)
+            FILES.extend(batch_data["image_name"])
 
             if args.rank == 0:
                 print(
@@ -171,11 +181,72 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             start_time = time.time()
 
         # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
+        # TODO(avirodov): PROBS should not be flattened if num_classes > 1 !
+        PROBS = PROBS.get_buffer().cpu().numpy().flatten()
         PREDS = PREDS.get_buffer().cpu().numpy()
         TARGETS = TARGETS.get_buffer().cpu().numpy()
         qwk = cohen_kappa_score(PREDS.astype(np.float64), TARGETS.astype(np.float64), weights="quadratic")
 
-    return loss, acc, qwk
+        if args.num_classes == 1:
+            fpr, tpr, thresholds = roc_curve(TARGETS, PROBS, pos_label=1)
+            auc = sklearn.metrics.auc(fpr, tpr)
+        else:
+            # Those are not well-defined for non-binary classification (maybe they can be if you can threshold along
+            #  a continuous parameter), and the network outputs probabilities only in case num_classes == 1. Otherwise
+            #  the PROBS array contains some numbers that sum to the label integer (rounded), and cannot be interpreted
+            #  as probability without changing the approach set by LabelEncodeIntegerGraded.
+            fpr, tpr, thresholds = -1, -1, []
+            auc = -1
+        if args.rank == 0:
+            print(f'{FILES=}')
+            print(f'{PROBS=}')
+            print(f'{PREDS=}')
+            print(f'{TARGETS=}')
+            print(f'{fpr=}')
+            print(f'{tpr=}')
+            print(f'{thresholds=}')
+
+        if args.rank == 0:
+
+            prediction_map = dict()
+            prediction_file_path = 'predictions_val.json'
+            if os.path.exists(prediction_file_path):
+
+                if epoch == 0:
+                    os.remove(prediction_file_path)
+                else:
+                    with open(prediction_file_path, 'r') as f:
+                        prediction_map = json.load(f)
+
+            if epoch not in prediction_map:
+                prediction_map[epoch] = []
+
+            for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
+                pred_file = dict()
+                pred_file['file_path'] = a_file
+                pred_file['target'] = a_target
+                pred_file['prediction'] = int(a_prob >= 0.5)
+                pred_file['probability'] = a_prob
+                if pred_file['target'] != pred_file['prediction']:
+                    pred_file['correct'] = False
+                else:
+                    pred_file['correct'] = True
+                prediction_map[epoch].append(pred_file)
+
+            with open(prediction_file_path, 'w') as json_file:
+                json.dump(prediction_map, json_file, indent=4)
+
+            fp = open(os.path.join('.', f'predictions_val.csv'), 'w')
+            fp.write('file,target,prediction,probability\n')
+            for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
+                fp.write(f'{a_file},{a_target},{int(a_prob >= 0.5)},{a_prob}\n')
+            fp.close()
+
+        precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1,
+                                                                                  average="weighted")
+
+    # return loss, acc, qwk
+    return loss, acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score
 
 
 def save_checkpoint(model, epoch, args, filename="model.pt", best_acc=0):
@@ -204,10 +275,10 @@ class LabelEncodeIntegerGraded(MapTransform):
     """
 
     def __init__(
-        self,
-        num_classes: int,
-        keys: KeysCollection = "label",
-        allow_missing_keys: bool = False,
+            self,
+            num_classes: int,
+            keys: KeysCollection = "label",
+            allow_missing_keys: bool = False,
     ):
         super().__init__(keys, allow_missing_keys)
         self.num_classes = num_classes
@@ -234,10 +305,11 @@ def list_data_collate(batch: collections.abc.Sequence):
     """
 
     for i, item in enumerate(batch):
-        # print(f"{i} = {item['image'].shape=} >> {item['image'].keys=}")
+        image_tensor = torch.stack([ix["image"] for ix in item], dim=0)
+        patch_location_tensor = torch.tensor(item[0]["image"].meta["location"])
         data = item[0]
-        data["image"] = torch.stack([ix["image"] for ix in item], dim=0)
-        # data["patch_location"] = torch.stack([ix["patch_location"] for ix in item], dim=0)
+        data["image"] = image_tensor
+        data["patch_location"] = patch_location_tensor
         batch[i] = data
     return default_collate(batch)
 
@@ -279,7 +351,8 @@ def main_worker(gpu, args):
 
     train_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True),
+            LoadImaged(keys=["image"], reader=WSIReader, backend=args.image_backend, dtype=np.uint8,
+                       level=args.image_level, image_only=True),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             RandGridPatchd(
                 keys=["image"],
@@ -300,7 +373,8 @@ def main_worker(gpu, args):
 
     valid_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True),
+            LoadImaged(keys=["image"], reader=WSIReader, backend=args.image_backend, dtype=np.uint8,
+                       level=args.image_level, image_only=False),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=args.num_classes),
             GridPatchd(
                 keys=["image"],
@@ -315,6 +389,12 @@ def main_worker(gpu, args):
         ]
     )
 
+    # Preserve file names for visualization
+    for dict in training_list:
+        dict["image_name"] = dict["image"]
+    for dict in validation_list:
+        dict["image_name"] = dict["image"]
+
     dataset_train = Dataset(data=training_list, transform=train_transform)
     dataset_valid = Dataset(data=validation_list, transform=valid_transform)
 
@@ -326,7 +406,7 @@ def main_worker(gpu, args):
         batch_size=args.batch_size,
         shuffle=(train_sampler is None),
         num_workers=args.workers,
-        pin_memory=True,
+        pin_memory=False,
         multiprocessing_context="spawn" if args.workers > 0 else None,
         sampler=train_sampler,
         collate_fn=list_data_collate,
@@ -336,7 +416,7 @@ def main_worker(gpu, args):
         batch_size=1,
         shuffle=False,
         num_workers=args.workers,
-        pin_memory=True,
+        pin_memory=False,
         multiprocessing_context="spawn" if args.workers > 0 else None,
         sampler=val_sampler,
         collate_fn=list_data_collate,
@@ -367,7 +447,10 @@ def main_worker(gpu, args):
     if args.validate:
         # if we only want to validate existing checkpoint
         epoch_time = time.time()
-        val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        # val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=0, args=args, max_tiles=args.tile_count)
+        val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = val_epoch(model, valid_loader, epoch=0,
+                                                                                          args=args,
+                                                                                          max_tiles=args.tile_count)
         if args.rank == 0:
             print(
                 "Final validation loss: {:.4f}".format(val_loss),
@@ -397,7 +480,7 @@ def main_worker(gpu, args):
     else:
         writer = None
 
-    #RUN TRAINING
+    # RUN TRAINING
     n_epochs = args.epochs
     val_acc_max = 0.0
 
@@ -431,19 +514,43 @@ def main_worker(gpu, args):
         if (epoch + 1) % args.val_every == 0:
 
             epoch_time = time.time()
-            val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
+            # val_loss, val_acc, qwk = val_epoch(model, valid_loader, epoch=epoch, args=args, max_tiles=args.tile_count)
+            val_loss, val_acc, qwk, fpr, tpr, auc, precision, recall, fbeta_score = val_epoch(model, valid_loader,
+                                                                                              epoch=epoch, args=args,
+                                                                                              max_tiles=args.tile_count)
             if args.rank == 0:
                 print(
                     "Final validation  {}/{}".format(epoch, n_epochs - 1),
                     "loss: {:.4f}".format(val_loss),
                     "acc: {:.4f}".format(val_acc),
+                    "auc: {:.4f}".format(auc),
+                    "precision: {:.4f}".format(precision),
+                    "recall: {:.4f}".format(recall),
                     "qwk: {:.4f}".format(qwk),
                     "time {:.2f}s".format(time.time() - epoch_time),
                 )
+
+                # send to clearml
+
+                Logger.current_logger().report_scalar("ACC", "train_acc", iteration=epoch, value=train_acc)
+                Logger.current_logger().report_scalar("ACC", "val_acc", iteration=epoch, value=val_acc)
+
+                Logger.current_logger().report_scalar("Loss", "train_loss", iteration=epoch, value=train_loss)
+                Logger.current_logger().report_scalar("Loss", "val_loss", iteration=epoch, value=val_loss)
+
+                Logger.current_logger().report_scalar("AUC", "val_auc", iteration=epoch, value=auc)
+                Logger.current_logger().report_scalar("Precision", "val_precision", iteration=epoch, value=precision)
+                Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch, value=recall)
+                Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch, value=fbeta_score)
+
                 if writer is not None:
                     writer.add_scalar("val_loss", val_loss, epoch)
                     writer.add_scalar("val_acc", val_acc, epoch)
                     writer.add_scalar("val_qwk", qwk, epoch)
+                    writer.add_scalar("val_auc", auc, epoch)
+                    writer.add_scalar("val_precision", precision, epoch)
+                    writer.add_scalar("val_recall", recall, epoch)
+                    writer.add_scalar("val_fbeta_score", fbeta_score, epoch)
 
                 val_acc = qwk
 
@@ -458,13 +565,14 @@ def main_worker(gpu, args):
                 print("Copying to model.pt new best model!!!!")
                 shutil.copyfile(os.path.join(args.logdir, "model_final.pt"), os.path.join(args.logdir, "model.pt"))
 
+                # send to clearml
+
         scheduler.step()
 
     print("ALL DONE")
 
 
 def parse_args():
-
     parser = argparse.ArgumentParser(description="Multiple Instance Learning (MIL) example of classification from WSI.")
     parser.add_argument(
         "--data_root", default="/PandaChallenge2020/train_images/", help="path to root folder of images"
@@ -494,14 +602,14 @@ def parse_args():
     parser.add_argument("--weight_decay", default=0, type=float, help="optimizer weight decay")
     parser.add_argument("--amp", action="store_true", help="use AMP, recommended")
     parser.add_argument("--val_every",
-        "--val_interval",
-        default=1,
-        type=int,
-        help="run validation after this number of epochs, default 1 to run every epoch",
-    )
+                        "--val_interval",
+                        default=1,
+                        type=int,
+                        help="run validation after this number of epochs, default 1 to run every epoch",
+                        )
     parser.add_argument("--workers", default=2, type=int, help="number of workers for data loading")
 
-    #for multigpu
+    # for multigpu
     parser.add_argument("--distributed", action="store_true", help="use multigpu training, recommended")
     parser.add_argument("--world_size", default=1, type=int, help="number of nodes for distributed training")
     parser.add_argument("--rank", default=0, type=int, help="node rank for distributed training")
@@ -514,6 +622,11 @@ def parse_args():
         "--quick", action="store_true", help="use a small subset of data for debugging"
     )
 
+    parser.add_argument('--project_name', type=str, default='monai-mil', help='name of project')
+    parser.add_argument('--task_name', type=str, default='monai-mil_template', help='name of task')
+    parser.add_argument('--image_backend', type=str, default='cucim', help='image backend to use')
+    parser.add_argument('--image_level', type=int, default=1, help='image level to use')
+
     args = parser.parse_args()
 
     print("Argument values:")
@@ -523,9 +636,12 @@ def parse_args():
 
     return args
 
+
 if __name__ == "__main__":
 
     args = parse_args()
+
+    task = Task.init(project_name=args.project_name, task_name=args.task_name)
 
     if args.dataset_json is None:
         # download default json datalist
