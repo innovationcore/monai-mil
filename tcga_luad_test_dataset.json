@@ -1,0 +1,30 @@
+{
+    "training": [
+        {
+            "image": "TCGA-55-8207-01Z-00-DX1.2dafc442-f927-4b0d-b197-cc8c5f86d0fc.svs",
+            "label": 1
+        },
+        {
+            "image": "TCGA-44-7661-01Z-00-DX1.baf72abd-edb9-4f56-beb3-f5138aa50930.svs",
+            "label": 1
+        },
+        {
+            "image": "TCGA-91-8496-01A-01-TS1.a92cfb28-63e4-4853-bc2c-4d614dfebdbf.svs",
+            "label": 0
+        },
+        {
+            "image": "TCGA-38-7271-11A-01-TS1.0125556f-24d6-4976-94fa-f092ebaa418a.svs",
+            "label": 0
+        }
+    ],
+    "validation": [
+        {
+            "image": "TCGA-55-6642-11A-01-TS1.e8d49a8e-def9-4a07-bee2-0f5a5a9db090.svs",
+            "label": 0
+        },
+        {
+            "image": "TCGA-97-7547-01A-01-TS1.85e09741-a86c-46b2-b73d-d04f54df0019.svs",
+            "label": 1
+        }
+    ]
+}
