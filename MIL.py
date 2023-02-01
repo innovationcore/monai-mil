@@ -543,6 +543,18 @@ def main_worker(gpu, args):
                 Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch, value=recall)
                 Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch, value=fbeta_score)
 
+                if hasattr(args, 'epoch_end_callback'):
+                    args.epoch_end_callback(epoch, {
+                        'train_acc': train_acc.item(),
+                        'val_acc': val_acc.item(),
+                        'train_loss': train_loss.item(),
+                        'val_loss': val_loss.item(),
+                        'val_auc': auc,
+                        'val_precision': precision,
+                        'val_recall': recall,
+                        'val_fbeta_score': fbeta_score,
+                    })
+
                 if writer is not None:
                     writer.add_scalar("val_loss", val_loss, epoch)
                     writer.add_scalar("val_acc", val_acc, epoch)
@@ -572,8 +584,7 @@ def main_worker(gpu, args):
     print("ALL DONE")
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Multiple Instance Learning (MIL) example of classification from WSI.")
+def add_args(parser):
     parser.add_argument(
         "--data_root", default="/PandaChallenge2020/train_images/", help="path to root folder of images"
     )
@@ -627,13 +638,15 @@ def parse_args():
     parser.add_argument('--image_backend', type=str, default='cucim', help='image backend to use')
     parser.add_argument('--image_level', type=int, default=1, help='image level to use')
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Multiple Instance Learning (MIL) example of classification from WSI.")
+    add_args(parser)
     args = parser.parse_args()
 
     print("Argument values:")
     for k, v in vars(args).items():
         print(k, "=>", v)
     print("-----------------")
-
     return args
 
 
