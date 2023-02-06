@@ -48,6 +48,28 @@ def xs_ys_to_mil_image_label(xs, ys):
     return [{"image": x, "label": y} for x, y in zip(xs, ys)]
 
 
+def main_worker_with_mongodb_updates(rank, args):
+    print(f'main_worker_with_mongodb_updates {rank=}')
+
+    if rank == 0:
+        client = MongoClient(args.mongodb_uri)
+        db = client[args.database]
+        print(f'{db=}')
+        jobs_collection = db.get_collection('jobs')
+        print(f'{jobs_collection=}')
+
+        def epoch_end_callback(epoch, metrics):
+            result_dict = {
+                "epoch": epoch,
+            }
+            result_dict.update(metrics)
+            jobs_collection.update_one({"_id": job_document_id}, {"$push": {"results": result_dict}})
+
+        args.epoch_end_callback = epoch_end_callback
+
+    main_worker(rank, args)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Process jobs from data.ai.uky.edu')
     parser.add_argument('--mongodb_uri', type=str, required=True)
@@ -176,27 +198,17 @@ def main():
     for k, v in vars(args).items():
         print(k, "=>", v)
     print("-----------------")
-    def epoch_end_callback(epoch, metrics):
-        result_dict = {
-            "epoch": epoch,
-        }
-        result_dict.update(metrics)
-        jobs_collection.update_one({"_id": job_document["_id"]}, {"$push": {"results": result_dict}})
 
-    args.epoch_end_callback = epoch_end_callback
-
+    args.job_document_id = job_document["_id"]
     if args.distributed:
-        def distributed_main_worker(rank):
-            print(f'distributed_main_worker {rank=}')
-            main_worker(rank, args)
         ngpus_per_node = torch.cuda.device_count()
         args.optim_lr = ngpus_per_node * args.optim_lr / 2  # heuristic to scale up learning rate in multigpu setup
         args.world_size = ngpus_per_node * args.world_size
 
         print("Multigpu", ngpus_per_node, "rescaled lr", args.optim_lr)
-        mp.spawn(distributed_main_worker, nprocs=ngpus_per_node)
+        mp.spawn(main_worker_with_mongodb_updates, nprocs=ngpus_per_node, args=(args,))
     else:
-        main_worker(0, args)
+        main_worker_with_mongodb_updates(0, args)
     #
     # for epoch in range(10):
     #     train_acc = 1.0 - np.exp(-epoch)
