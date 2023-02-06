@@ -53,6 +53,7 @@ def main():
     parser.add_argument('--mongodb_uri', type=str, required=True)
     parser.add_argument('--database', type=str, default="slide_dataset_site_dev")
     parser.add_argument('--openslide_dll_path', type=str, default=None)
+    parser.add_argument('--stratify', type=int, default=1)
     add_args(parser)
     args = parser.parse_args()
     print(f'{args=}')
@@ -78,7 +79,7 @@ def main():
     # print(f'{job_document=}')
     if job_document is None:
         print(f'No new jobs')
-        return
+        return 0
     # find_one will return a dict, which is useful for copying it into clearml.
     job_document = jobs_collection.find_one({"_id": job_document["_id"]})
     # print(f'dict {job_document=}')
@@ -106,6 +107,7 @@ def main():
     # { slide -> label }
     xs, ys = [], []
     cohorts = job_document["data"]["cohorts"]
+    print(f'{cohorts=}')
     for label, cohort in cohorts.items():
         print(f'{label=}')
         cases = cohort["data"]["cases"]
@@ -113,29 +115,29 @@ def main():
         # print(f'{slides=}')
         xs.extend(slides)
         ys.extend([label] * len(slides))
-    xs = [
-        'TCGA-97-7547-01A-01-TS1.85e09741-a86c-46b2-b73d-d04f54df0019.svs',
-        'TCGA-75-7025-01A-01-TS1.90ebf9d8-a329-4ae0-b62f-8f79b0b9d800.svs',
-        'TCGA-78-7152-01A-01-BS1.17987afb-41a5-44ff-94e2-a282163a10be.svs',
-        'TCGA-55-8204-01Z-00-DX1.30ba69f3-53f1-41cc-826c-20dce3cfe86b.svs',
-        'TCGA-55-8511-11A-01-TS1.c28c0917-114a-48bb-ae2b-3bb5c057660a.svs',
-        'TCGA-55-7724-11A-01-TS1.86e82089-33ea-43ab-8b9c-be619924fbe4.svs',
-        'TCGA-75-6205-01A-01-TS1.30141d32-1c26-41d9-8b2e-590b32cb59b6.svs',
-        'TCGA-44-8119-11A-01-TS1.d7257647-1870-456f-869c-a89806caba2a.svs',
-        'TCGA-75-7031-01A-01-TS1.ff890643-cd25-4528-ab56-1d866053de60.svs',
-        'TCGA-91-6828-01A-01-TS1.9582619f-ecd4-4890-8af1-14e5eb0f536e.svs',
-        'TCGA-78-7220-01A-01-TS1.322a58dc-7371-4745-90f7-395370a8fd53.svs',
-        'TCGA-55-8505-01Z-00-DX1.D364C30D-BFB8-486B-A0D3-948FF8E90C3E.svs',
-        'TCGA-78-7540-01A-01-BS1.79380837-059e-4a6c-b052-7adafbca468c.svs',
-        'TCGA-78-7163-01A-01-TS1.4b63c412-8fd3-4353-abcd-b9b866b36f87.svs',
-        'TCGA-55-6642-01A-01-TS1.7451219e-0c43-4268-8c42-15f186f66fa3.svs',
-        'TCGA-55-8301-11A-01-TS1.cbe043d9-a89d-4c4c-a6fa-ca5268334b83.svs',
-        'TCGA-55-7281-11A-01-TS1.199c495b-020e-42c8-9197-880d6069dab4.svs',
-        'TCGA-78-7540-01A-01-TS1.aa2d97a4-60a1-496f-b7c3-58b887d174ce.svs',
-        'TCGA-55-8514-11A-01-TS1.0f2a46b7-61e1-4991-948b-5407896bacd7.svs',
-        'TCGA-78-7535-01A-01-BS1.bece83ec-80c6-4163-b489-2495f624cd06.svs',
-    ]
-    ys = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+#    xs = [
+#        'TCGA-97-7547-01A-01-TS1.85e09741-a86c-46b2-b73d-d04f54df0019.svs',
+#        'TCGA-75-7025-01A-01-TS1.90ebf9d8-a329-4ae0-b62f-8f79b0b9d800.svs',
+#        'TCGA-78-7152-01A-01-BS1.17987afb-41a5-44ff-94e2-a282163a10be.svs',
+#        'TCGA-55-8204-01Z-00-DX1.30ba69f3-53f1-41cc-826c-20dce3cfe86b.svs',
+#        'TCGA-55-8511-11A-01-TS1.c28c0917-114a-48bb-ae2b-3bb5c057660a.svs',
+#        'TCGA-55-7724-11A-01-TS1.86e82089-33ea-43ab-8b9c-be619924fbe4.svs',
+#        'TCGA-75-6205-01A-01-TS1.30141d32-1c26-41d9-8b2e-590b32cb59b6.svs',
+#        'TCGA-44-8119-11A-01-TS1.d7257647-1870-456f-869c-a89806caba2a.svs',
+#        'TCGA-75-7031-01A-01-TS1.ff890643-cd25-4528-ab56-1d866053de60.svs',
+#        'TCGA-91-6828-01A-01-TS1.9582619f-ecd4-4890-8af1-14e5eb0f536e.svs',
+#        'TCGA-78-7220-01A-01-TS1.322a58dc-7371-4745-90f7-395370a8fd53.svs',
+#        'TCGA-55-8505-01Z-00-DX1.D364C30D-BFB8-486B-A0D3-948FF8E90C3E.svs',
+#        'TCGA-78-7540-01A-01-BS1.79380837-059e-4a6c-b052-7adafbca468c.svs',
+#        'TCGA-78-7163-01A-01-TS1.4b63c412-8fd3-4353-abcd-b9b866b36f87.svs',
+#        'TCGA-55-6642-01A-01-TS1.7451219e-0c43-4268-8c42-15f186f66fa3.svs',
+#        'TCGA-55-8301-11A-01-TS1.cbe043d9-a89d-4c4c-a6fa-ca5268334b83.svs',
+#        'TCGA-55-7281-11A-01-TS1.199c495b-020e-42c8-9197-880d6069dab4.svs',
+#        'TCGA-78-7540-01A-01-TS1.aa2d97a4-60a1-496f-b7c3-58b887d174ce.svs',
+#        'TCGA-55-8514-11A-01-TS1.0f2a46b7-61e1-4991-948b-5407896bacd7.svs',
+#        'TCGA-78-7535-01A-01-BS1.bece83ec-80c6-4163-b489-2495f624cd06.svs',
+#    ]
+#    ys = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
     print(f'{len(xs)=}')
     print(f'{len(ys)=}')
 
@@ -145,9 +147,9 @@ def main():
     args.epochs = epochs
 
     print(f'{val_percentage=} {test_percentage=}')
-    x_train, x_test, y_train, y_test = train_test_split(xs, ys, stratify=ys,
+    x_train, x_test, y_train, y_test = train_test_split(xs, ys, stratify=ys if args.stratify > 0 else None,
                                                         test_size=(val_percentage + test_percentage) / 100.0)
-    x_test, x_val, y_test, y_val = train_test_split(x_test, y_test, stratify=y_test,
+    x_test, x_val, y_test, y_val = train_test_split(x_test, y_test, stratify=y_test if args.stratify > 0 else None,
                                                     test_size=val_percentage / (val_percentage + test_percentage))
 
     # Generate the train-test split and save the generated .json MONAI-MIL dataset.
@@ -184,12 +186,15 @@ def main():
     args.epoch_end_callback = epoch_end_callback
 
     if args.distributed:
+        def distributed_main_worker(rank):
+            print(f'distributed_main_worker {rank=}')
+            main_worker(rank, args)
         ngpus_per_node = torch.cuda.device_count()
         args.optim_lr = ngpus_per_node * args.optim_lr / 2  # heuristic to scale up learning rate in multigpu setup
         args.world_size = ngpus_per_node * args.world_size
 
         print("Multigpu", ngpus_per_node, "rescaled lr", args.optim_lr)
-        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(args,))
+        mp.spawn(distributed_main_worker, nprocs=ngpus_per_node)
     else:
         main_worker(0, args)
     #
@@ -202,9 +207,14 @@ def main():
     # Update job status to 'complete'.
     jobs_collection.update_one({"_id": job_document["_id"]},
                                {"$set": {f"status.{int(time.time())}": 'Job complete'}})
+    return 1
 
 
 
 
 if __name__ == "__main__":
-    main()
+    while True:
+        result = main()
+        if result == 0:
+            # No job was found, wait between polls.
+            time.sleep(5.0)
