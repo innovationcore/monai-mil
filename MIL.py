@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 import json
+from os.path import isfile
 
 import gdown
 import numpy as np
@@ -206,41 +207,46 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             print(f'{tpr=}')
             print(f'{thresholds=}')
 
-        if args.rank == 0:
+        #if args.rank == 0:
+        # all GPUS have to record output
 
-            prediction_map = dict()
-            prediction_file_path = 'predictions_val.json'
-            if os.path.exists(prediction_file_path):
+        prediction_map = dict()
+        prediction_file_path = str(args.rank) + '_' + args.predict_json
+        if os.path.exists(prediction_file_path):
+            print(prediction_file_path, 'found')
+            if epoch == 0:
+                os.remove(prediction_file_path)
+            else:
+                with open(prediction_file_path, 'r') as f:
+                    prediction_map = json.load(f)
 
-                if epoch == 0:
-                    os.remove(prediction_file_path)
-                else:
-                    with open(prediction_file_path, 'r') as f:
-                        prediction_map = json.load(f)
+        if epoch not in prediction_map:
+            prediction_map[epoch] = []
 
-            if epoch not in prediction_map:
-                prediction_map[epoch] = []
+        for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
+            pred_file = dict()
+            pred_file['file_path'] = a_file
+            pred_file['target'] = a_target
+            pred_file['prediction'] = int(a_prob >= 0.5)
+            pred_file['probability'] = a_prob
+            if pred_file['target'] != pred_file['prediction']:
+                pred_file['correct'] = False
+            else:
+                pred_file['correct'] = True
+            prediction_map[epoch].append(pred_file)
 
-            for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
-                pred_file = dict()
-                pred_file['file_path'] = a_file
-                pred_file['target'] = a_target
-                pred_file['prediction'] = int(a_prob >= 0.5)
-                pred_file['probability'] = a_prob
-                if pred_file['target'] != pred_file['prediction']:
-                    pred_file['correct'] = False
-                else:
-                    pred_file['correct'] = True
-                prediction_map[epoch].append(pred_file)
+        print('saving', prediction_file_path)
+        with open(prediction_file_path, 'w') as json_file:
+            json.dump(prediction_map, json_file, indent=4)
 
-            with open(prediction_file_path, 'w') as json_file:
-                json.dump(prediction_map, json_file, indent=4)
+        '''
+        fp = open(os.path.join('.', f'predictions_val.csv'), 'w')
+        fp.write('file,target,prediction,probability\n')
+        for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
+            fp.write(f'{a_file},{a_target},{int(a_prob >= 0.5)},{a_prob}\n')
+        fp.close()
+        '''
 
-            fp = open(os.path.join('.', f'predictions_val.csv'), 'w')
-            fp.write('file,target,prediction,probability\n')
-            for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
-                fp.write(f'{a_file},{a_target},{int(a_prob >= 0.5)},{a_prob}\n')
-            fp.close()
 
         precision, recall, fbeta_score, support = precision_recall_fscore_support(TARGETS, PREDS, pos_label=1,
                                                                                   average="weighted")
@@ -589,6 +595,7 @@ def add_args(parser):
         "--data_root", default="/PandaChallenge2020/train_images/", help="path to root folder of images"
     )
     parser.add_argument("--dataset_json", default=None, type=str, help="path to dataset json file")
+    parser.add_argument("--predict_json", default='predictions_val.json', type=str, help="path to dataset json file")
 
     parser.add_argument("--num_classes", default=5, type=int, help="number of output classes")
     parser.add_argument("--mil_mode", default="att_trans", help="MIL algorithm")
@@ -649,6 +656,27 @@ def parse_args():
     print("-----------------")
     return args
 
+def process_pred_logs():
+
+    combined_predictions = dict()
+
+    files = [f for f in os.listdir('.') if os.path.isfile(f)]
+    for file in files:
+        if args.predict_json in file:
+            with open(file, 'r') as f:
+                predictions_val = json.load(f)
+
+                for epoch in predictions_val.items():
+                    epoch_num = epoch[0]
+                    if epoch_num not in combined_predictions:
+                        combined_predictions[epoch_num] = []
+                    for prob in predictions_val[epoch_num]:
+                        combined_predictions[epoch_num].append(prob)
+            os.remove(file)
+
+    print('saving', args.predict_json)
+    with open(args.predict_json, 'w') as json_file:
+        json.dump(combined_predictions, json_file, indent=4)
 
 if __name__ == "__main__":
 
@@ -671,5 +699,8 @@ if __name__ == "__main__":
 
         print("Multigpu", ngpus_per_node, "rescaled lr", args.optim_lr)
         mp.spawn(main_worker, nprocs=ngpus_per_node, args=(args,))
+
     else:
         main_worker(0, args)
+
+    process_pred_logs()
