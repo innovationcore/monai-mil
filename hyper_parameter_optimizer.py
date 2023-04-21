@@ -69,14 +69,16 @@ an_optimizer = HyperParameterOptimizer(
     hyper_parameters=[
 #--tile_count=33 --mil_mode=att_trans   --tile_size=768 --num_classes=1
 
-        UniformIntegerParameterRange('Args/epochs', min_value=3, max_value=20, step_size=2),
-        UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=3, step_size=1),
-        UniformIntegerParameterRange('Args/tile_count', min_value=1, max_value=33, step_size=2),
-        UniformIntegerParameterRange('Args/tile_size', min_value=256, max_value=768, step_size=256),
+        UniformIntegerParameterRange('Args/epochs', min_value=5, max_value=20, step_size=2),
+        UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=16, step_size=2),
+        UniformIntegerParameterRange('Args/tile_count', min_value=1, max_value=500, step_size=2),
+        #UniformIntegerParameterRange('Args/tile_size', min_value=224, max_value=768, step_size=256),
 
         UniformParameterRange('Args/optim_lr', min_value=0.000001, max_value=0.0001),
 
+        DiscreteParameterRange('Args/tile_size', values=[224,256,384,512,768]),
         DiscreteParameterRange('Args/mil_mode', values=['mean', 'max', 'att', 'att_trans']),
+
 
         #DiscreteParameterRange('Args/train_file', values=["/workspace/path_train.csv"]),
         #DiscreteParameterRange('Args/validation_file', values=["/workspace/path_val.csv"]),
