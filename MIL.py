@@ -101,6 +101,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
     run_loss = CumulativeAverage()
     run_acc = CumulativeAverage()
+    # these need to work across processes
     FILES = []  # TODO(avirodov): this is probably not good for multiprocessing.
     PROBS = Cumulative()
     PREDS = Cumulative()
@@ -115,11 +116,6 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
         for idx, batch_data in enumerate(loader):
             data = batch_data["image"].as_subclass(torch.Tensor).cuda(args.rank)
             target = batch_data["label"].as_subclass(torch.Tensor).cuda(args.rank)
-
-
-
-            #if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
-            print('1',batch_data['image_name'],batch_data["image_name"],target.cpu().numpy())
 
             with autocast(enabled=args.amp):
 
@@ -174,9 +170,6 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
 
-            #if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
-            print('2', batch_data["image_name"],target.cpu().numpy())
-
             # targets and file relations are ok here
 
             run_loss.append(loss)
@@ -189,8 +182,6 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             PREDS.extend(pred)
             TARGETS.extend(target)
             FILES.extend(batch_data["image_name"])
-
-
 
             if args.rank == 0:
                 print(
@@ -240,11 +231,6 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             print(f'{tpr=}')
             print(f'{thresholds=}')
 
-        count = 0
-        for f in FILES:
-            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b.isyntax' in f:
-                print(f, TARGETS[count], 'BROKEN!!!')
-            count += 1
 
         #if args.rank == 0:
         # all GPUS have to record output
@@ -274,10 +260,6 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             else:
                 pred_file['correct'] = True
             prediction_map[epoch].append(pred_file)
-
-            #if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in a_file:
-            print('3', a_file,a_target)
-
 
 
         print('saving', prediction_file_path)
@@ -717,7 +699,7 @@ def process_pred_logs():
                         combined_predictions[epoch_num] = []
                     for prob in predictions_val[epoch_num]:
                         combined_predictions[epoch_num].append(prob)
-            #os.remove(file)
+            os.remove(file)
 
     print('saving', args.predict_json)
     with open(args.predict_json, 'w') as json_file:
