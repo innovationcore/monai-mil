@@ -703,7 +703,7 @@ def process_pred_logs():
                         combined_predictions[epoch_num] = []
                     for prob in predictions_val[epoch_num]:
                         combined_predictions[epoch_num].append(prob)
-            os.remove(file)
+            #os.remove(file)
 
     print('saving', args.predict_json)
     with open(args.predict_json, 'w') as json_file:
