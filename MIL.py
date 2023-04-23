@@ -233,6 +233,13 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             print(f'{tpr=}')
             print(f'{thresholds=}')
 
+        count = 0
+        for f in FILES:
+            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b.isyntax' in f:
+                print(f, TARGETS[count])
+                exit(0)
+            count += 1
+
         #if args.rank == 0:
         # all GPUS have to record output
 
@@ -248,6 +255,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
         if epoch not in prediction_map:
             prediction_map[epoch] = []
+
 
         for a_file, a_target, a_prob in zip(FILES, TARGETS.tolist(), PROBS.tolist()):
             pred_file = dict()
