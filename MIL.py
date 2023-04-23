@@ -177,15 +177,20 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             #if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
             print('2', batch_data["image_name"],target.cpu().numpy())
 
+            # targets and file relations are ok here
+
             run_loss.append(loss)
             run_acc.append(acc)
             loss = run_loss.aggregate()
             acc = run_acc.aggregate()
 
+            #what is happening here, could it be breaking
             PROBS.extend(prob)
             PREDS.extend(pred)
             TARGETS.extend(target)
             FILES.extend(batch_data["image_name"])
+
+
 
             if args.rank == 0:
                 print(
@@ -206,6 +211,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                 print(f'done with image')
 
             start_time = time.time()
+
+        # targets and file relations are broken here
 
         # Calculate QWK metric (Quadratic Weigted Kappa) https://en.wikipedia.org/wiki/Cohen%27s_kappa
         # TODO(avirodov): PROBS should not be flattened if num_classes > 1 !
@@ -236,8 +243,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
         count = 0
         for f in FILES:
             if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b.isyntax' in f:
-                print(f, TARGETS[count])
-                exit(0)
+                print(f, TARGETS[count], 'BROKEN!!!')
             count += 1
 
         #if args.rank == 0:
