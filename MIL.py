@@ -113,11 +113,11 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
         tile_fp.write('file,tile_x,tile_y,probability\n')
 
         for idx, batch_data in enumerate(loader):
-            print(batch_data)
-            exit(0)
             data = batch_data["image"].as_subclass(torch.Tensor).cuda(args.rank)
             target = batch_data["label"].as_subclass(torch.Tensor).cuda(args.rank)
 
+            print(batch_data['image_name'],target)
+            
             with autocast(enabled=args.amp):
 
                 if (max_tiles is not None and data.shape[1] > max_tiles) or True:
