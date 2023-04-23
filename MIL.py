@@ -116,8 +116,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             data = batch_data["image"].as_subclass(torch.Tensor).cuda(args.rank)
             target = batch_data["label"].as_subclass(torch.Tensor).cuda(args.rank)
 
-            print(batch_data['image_name'],target)
-            
+            print(batch_data['image_name'],target.sum(1).round())
+
             with autocast(enabled=args.amp):
 
                 if (max_tiles is not None and data.shape[1] > max_tiles) or True:
