@@ -116,7 +116,10 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             data = batch_data["image"].as_subclass(torch.Tensor).cuda(args.rank)
             target = batch_data["label"].as_subclass(torch.Tensor).cuda(args.rank)
 
-            print('1',batch_data['image_name'],target.sum(1).round())
+
+
+            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
+                print('1',batch_data['image_name'],batch_data["image_name"],target.cpu().numpy())
 
             with autocast(enabled=args.amp):
 
@@ -171,7 +174,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
 
-            print('2', batch_data["image_name"],target.cpu().numpy())
+            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
+                print('2', batch_data["image_name"],target.cpu().numpy())
 
             run_loss.append(loss)
             run_acc.append(acc)
@@ -256,6 +260,11 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             else:
                 pred_file['correct'] = True
             prediction_map[epoch].append(pred_file)
+
+            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in a_file:
+                print('2', a_file,a_target)
+
+
 
         print('saving', prediction_file_path)
         with open(prediction_file_path, 'w') as json_file:
