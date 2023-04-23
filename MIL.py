@@ -171,7 +171,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
 
-            print('2', batch_data['image_name'], target.sum(1).round())
+            print('2', tile_prob,prob,pred,target)
 
             run_loss.append(loss)
             run_acc.append(acc)
