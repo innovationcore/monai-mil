@@ -116,7 +116,7 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             data = batch_data["image"].as_subclass(torch.Tensor).cuda(args.rank)
             target = batch_data["label"].as_subclass(torch.Tensor).cuda(args.rank)
 
-            print(batch_data['image_name'],target.sum(1).round())
+            print('1',batch_data['image_name'],target.sum(1).round())
 
             with autocast(enabled=args.amp):
 
@@ -170,6 +170,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             pred = logits.sigmoid().sum(1).detach().round()
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
+
+            print('2', batch_data['image_name'], target.sum(1).round())
 
             run_loss.append(loss)
             run_acc.append(acc)
