@@ -118,8 +118,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
 
 
 
-            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
-                print('1',batch_data['image_name'],batch_data["image_name"],target.cpu().numpy())
+            #if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
+            print('1',batch_data['image_name'],batch_data["image_name"],target.cpu().numpy())
 
             with autocast(enabled=args.amp):
 
@@ -174,8 +174,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
             target = target.sum(1).round()
             acc = (pred == target).float().mean()
 
-            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
-                print('2', batch_data["image_name"],target.cpu().numpy())
+            #if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in batch_data["image_name"]:
+            print('2', batch_data["image_name"],target.cpu().numpy())
 
             run_loss.append(loss)
             run_acc.append(acc)
@@ -261,8 +261,8 @@ def val_epoch(model, loader, epoch, args, max_tiles=None):
                 pred_file['correct'] = True
             prediction_map[epoch].append(pred_file)
 
-            if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in a_file:
-                print('2', a_file,a_target)
+            #if 'deident_6406535e-7e00-4a5d-bc6c-2ea557d42d1b' in a_file:
+            print('3', a_file,a_target)
 
 
 
