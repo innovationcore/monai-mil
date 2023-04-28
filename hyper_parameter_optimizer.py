@@ -69,13 +69,14 @@ an_optimizer = HyperParameterOptimizer(
     hyper_parameters=[
 #--tile_count=33 --mil_mode=att_trans   --tile_size=768 --num_classes=1
 
-        UniformIntegerParameterRange('Args/epochs', min_value=5, max_value=20, step_size=2),
-        UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=16, step_size=2),
+        UniformIntegerParameterRange('Args/epochs', min_value=4, max_value=20, step_size=2),
+        UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=6, step_size=1),
         UniformIntegerParameterRange('Args/tile_count', min_value=1, max_value=500, step_size=2),
         #UniformIntegerParameterRange('Args/tile_size', min_value=224, max_value=768, step_size=256),
 
-        UniformParameterRange('Args/optim_lr', min_value=0.000001, max_value=0.0001),
+        UniformParameterRange('Args/optim_lr', min_value=0.000001, max_value=0.0005),
 
+        DiscreteParameterRange('Args/image_level', values=[3,4,5]),
         DiscreteParameterRange('Args/tile_size', values=[224,256,384,512,768]),
         DiscreteParameterRange('Args/mil_mode', values=['mean', 'max', 'att', 'att_trans']),
 
@@ -105,7 +106,7 @@ an_optimizer = HyperParameterOptimizer(
     # more are coming soon...
     optimizer_class=aSearchStrategy,
     # Select an execution queue to schedule the experiments for execution
-    execution_queue='default',
+    execution_queue='ibia100',
     # Optional: Limit the execution time of a single experiment, in minutes.
     # (this is optional, and if using  OptimizerBOHB, it is ignored)
     time_limit_per_job=240,
