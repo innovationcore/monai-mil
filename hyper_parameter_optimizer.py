@@ -69,9 +69,9 @@ an_optimizer = HyperParameterOptimizer(
     hyper_parameters=[
 #--tile_count=33 --mil_mode=att_trans   --tile_size=768 --num_classes=1
 
-        UniformIntegerParameterRange('Args/epochs', min_value=4, max_value=20, step_size=2),
+        UniformIntegerParameterRange('Args/epochs', min_value=6, max_value=20, step_size=2),
         UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=6, step_size=1),
-        UniformIntegerParameterRange('Args/tile_count', min_value=1, max_value=500, step_size=2),
+        UniformIntegerParameterRange('Args/tile_count', min_value=8, max_value=128, step_size=8),
         #UniformIntegerParameterRange('Args/tile_size', min_value=224, max_value=768, step_size=256),
 
         UniformParameterRange('Args/optim_lr', min_value=0.000001, max_value=0.0005),
