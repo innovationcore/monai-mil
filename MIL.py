@@ -565,16 +565,17 @@ def main_worker(gpu, args):
 
                 # send to clearml
 
-                #Logger.current_logger().report_scalar("ACC", "train_acc", iteration=epoch, value=train_acc)
-                #Logger.current_logger().report_scalar("ACC", "val_acc", iteration=epoch, value=val_acc)
+                Logger.current_logger().report_scalar("ACC", "train_acc", iteration=epoch, value=train_acc)
+                Logger.current_logger().report_scalar("ACC", "val_acc", iteration=epoch, value=val_acc)
 
-                #Logger.current_logger().report_scalar("Loss", "train_loss", iteration=epoch, value=train_loss)
-                #Logger.current_logger().report_scalar("Loss", "val_loss", iteration=epoch, value=val_loss)
+                Logger.current_logger().report_scalar("Loss", "train_loss", iteration=epoch, value=train_loss)
+                Logger.current_logger().report_scalar("Loss", "val_loss", iteration=epoch, value=val_loss)
 
-                #Logger.current_logger().report_scalar("AUC", "val_auc", iteration=epoch, value=auc)
-                #Logger.current_logger().report_scalar("Precision", "val_precision", iteration=epoch, value=precision)
-                #Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch, value=recall)
-                #Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch, value=fbeta_score)
+                Logger.current_logger().report_scalar("AUC", "val_auc", iteration=epoch, value=auc)
+                Logger.current_logger().report_scalar("Precision", "val_precision", iteration=epoch, value=precision)
+                Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch, value=recall)
+                Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch, value=fbeta_score)
+                Logger.current_logger().report_scalar("qwk", "val_qwk", iteration=epoch, value=qwk)
 
                 if hasattr(args, 'epoch_end_callback'):
                     args.epoch_end_callback(epoch, {
@@ -586,6 +587,8 @@ def main_worker(gpu, args):
                         'val_precision': precision,
                         'val_recall': recall,
                         'val_fbeta_score': fbeta_score,
+                        'val_qwk': qwk,
+
                     })
 
                 if writer is not None:
@@ -596,6 +599,7 @@ def main_worker(gpu, args):
                     writer.add_scalar("val_precision", precision, epoch)
                     writer.add_scalar("val_recall", recall, epoch)
                     writer.add_scalar("val_fbeta_score", fbeta_score, epoch)
+                    writer.add_scalar("val_qwk", qwk, epoch)
 
                 #val_acc = qwk
 
