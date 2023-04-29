@@ -515,7 +515,7 @@ def main_worker(gpu, args):
 
     # RUN TRAINING
     n_epochs = args.epochs
-    val_acc_max = 0.0
+    val_auc_max = 0.0
 
     scaler = GradScaler(enabled=args.amp)
 
@@ -543,7 +543,7 @@ def main_worker(gpu, args):
             writer.add_scalar("train_acc", train_acc, epoch)
 
         b_new_best = False
-        val_acc = 0
+        val_auc = 0
         if (epoch + 1) % args.val_every == 0:
 
             epoch_time = time.time()
@@ -565,16 +565,16 @@ def main_worker(gpu, args):
 
                 # send to clearml
 
-                Logger.current_logger().report_scalar("ACC", "train_acc", iteration=epoch, value=train_acc)
-                Logger.current_logger().report_scalar("ACC", "val_acc", iteration=epoch, value=val_acc)
+                #Logger.current_logger().report_scalar("ACC", "train_acc", iteration=epoch, value=train_acc)
+                #Logger.current_logger().report_scalar("ACC", "val_acc", iteration=epoch, value=val_acc)
 
-                Logger.current_logger().report_scalar("Loss", "train_loss", iteration=epoch, value=train_loss)
-                Logger.current_logger().report_scalar("Loss", "val_loss", iteration=epoch, value=val_loss)
+                #Logger.current_logger().report_scalar("Loss", "train_loss", iteration=epoch, value=train_loss)
+                #Logger.current_logger().report_scalar("Loss", "val_loss", iteration=epoch, value=val_loss)
 
-                Logger.current_logger().report_scalar("AUC", "val_auc", iteration=epoch, value=auc)
-                Logger.current_logger().report_scalar("Precision", "val_precision", iteration=epoch, value=precision)
-                Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch, value=recall)
-                Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch, value=fbeta_score)
+                #Logger.current_logger().report_scalar("AUC", "val_auc", iteration=epoch, value=auc)
+                #Logger.current_logger().report_scalar("Precision", "val_precision", iteration=epoch, value=precision)
+                #Logger.current_logger().report_scalar("Recall", "val_recall", iteration=epoch, value=recall)
+                #Logger.current_logger().report_scalar("FBeta", "val_fbeta_score", iteration=epoch, value=fbeta_score)
 
                 if hasattr(args, 'epoch_end_callback'):
                     args.epoch_end_callback(epoch, {
@@ -597,10 +597,11 @@ def main_worker(gpu, args):
                     writer.add_scalar("val_recall", recall, epoch)
                     writer.add_scalar("val_fbeta_score", fbeta_score, epoch)
 
-                val_acc = qwk
+                #val_acc = qwk
 
-                if val_acc > val_acc_max:
-                    print("qwk ({:.6f} --> {:.6f})".format(val_acc_max, val_acc))
+                if val_auc > val_auc_max:
+                    #print("qwk ({:.6f} --> {:.6f})".format(val_acc_max, val_acc))
+                    print("auc ({:.6f} --> {:.6f})".format(val_auc_max, val_auc))
                     val_acc_max = val_acc
                     b_new_best = True
 
