@@ -70,7 +70,7 @@ an_optimizer = HyperParameterOptimizer(
 #--tile_count=33 --mil_mode=att_trans   --tile_size=768 --num_classes=1
 
         UniformIntegerParameterRange('Args/epochs', min_value=6, max_value=20, step_size=2),
-        UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=6, step_size=1),
+        UniformIntegerParameterRange('Args/batch_size', min_value=1, max_value=5, step_size=1),
         UniformIntegerParameterRange('Args/tile_count', min_value=8, max_value=128, step_size=8),
         #UniformIntegerParameterRange('Args/tile_size', min_value=224, max_value=768, step_size=256),
 
@@ -87,8 +87,8 @@ an_optimizer = HyperParameterOptimizer(
     ],
 
     # this is the objective metric we want to maximize/minimize
-    objective_metric_title='Loss',
-    objective_metric_series='val_loss',
+    objective_metric_title='AUC',
+    objective_metric_series='val_auc',
 
     #big label
     #objective_metric_title='accuracy',
