@@ -77,7 +77,7 @@ an_optimizer = HyperParameterOptimizer(
         UniformParameterRange('Args/optim_lr', min_value=0.000001, max_value=0.0005),
 
         DiscreteParameterRange('Args/image_level', values=[3,4,5]),
-        DiscreteParameterRange('Args/tile_size', values=[224,256,384,512,768]),
+        DiscreteParameterRange('Args/tile_size', values=[224,256,384,512]),
         DiscreteParameterRange('Args/mil_mode', values=['mean', 'max', 'att', 'att_trans']),
 
 
