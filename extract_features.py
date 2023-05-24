@@ -136,12 +136,38 @@ def extract_image_files(args):
         with open(args.output_path, "w") as outfile:
             outfile.write(json_object)
 
+        #convert to ml format
+        df_list = []
+        for extract in feature_extract_results:
+
+            file_path = extract['file_path']
+            features = [extract['features']]
+
+            print('processing:', file_path)
+
+            new_df = pd.DataFrame(data=features)
+            if '1' in file_path:
+                new_df['class'] = 1
+            else:
+                new_df['class'] = 0
+
+            df_list.append(new_df)
+
+        df = pd.concat(df_list)
+        df = df.reset_index()
+        df = df.drop('index', axis=1)
+        df.index.name = 'index'
+
+        df.to_csv(args.ml_output_path)
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='CLIP Image Feature Extractor')
     parser.add_argument('--model_path', type=str, default='openai/clip-vit-base-patch32', help='name of project')
     parser.add_argument('--input_path', type=str, default='images', help='name of project')
     parser.add_argument('--output_path', type=str, default='extracts.json', help='name of project')
+    parser.add_argument('--ml_output_path', type=str, default='ml_extracts.csv', help='name of project')
 
     #using openslide
     parser.add_argument('--prediction_threshold', type=float, default=0.8, help='name of project')
