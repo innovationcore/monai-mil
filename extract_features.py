@@ -143,7 +143,7 @@ def extract_slides(args):
                 rgb_im_tile.save(save_file_path)
 
                 #save image information
-                image_report[save_file] = tile_list
+                image_report[save_file] = tile
         else:
             print('slide',slide_path,'not found.')
 
