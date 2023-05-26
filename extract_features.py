@@ -142,6 +142,13 @@ def extract_slides(args):
         else:
             print('slide',slide_path,'not found.')
 
+    # Serializing json
+    json_object = json.dumps(tile_map, indent=4)
+
+    # Writing to sample.json
+    with open(args.report_output_path, "w") as outfile:
+        outfile.write(json_object)
+
 def extract_image_files(args):
 
     feature_extract_results = []
@@ -214,6 +221,7 @@ if __name__ == '__main__':
     parser.add_argument('--preprocess_dataset_path', type=str, default='extract_dump.json', help='name of project')
     parser.add_argument('--tile_predictions_path', type=str, default='tile_predictions_val.csv', help='name of project')
     parser.add_argument('--image_output_path', type=str, default='extracted_images', help='name of project')
+    parser.add_argument('--report_output_path', type=str, default='image_report.json', help='name of project')
 
     parser.add_argument(
         "--slide_extract",
