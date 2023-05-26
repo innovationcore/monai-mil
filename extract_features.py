@@ -118,6 +118,8 @@ def extract_slides(args):
                     print(tile_id)
                 exit(0)
 
+    image_report = dict()
+
     # extract resulting set
     for filename, tile_list in tile_map.items():
         slide_path = os.path.join(args.slide_path,filename)
@@ -139,11 +141,14 @@ def extract_slides(args):
                 save_file_path = os.path.join(args.image_output_path,str(tile['label']),save_file)
                 rgb_im_tile = im_tile.convert('RGB')
                 rgb_im_tile.save(save_file_path)
+
+                #save image information
+                image_report[save_file] = tile_list
         else:
             print('slide',slide_path,'not found.')
 
     # Serializing json
-    json_object = json.dumps(tile_map, indent=4)
+    json_object = json.dumps(image_report, indent=4)
 
     # Writing to sample.json
     with open(args.report_output_path, "w") as outfile:
